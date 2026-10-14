@@ -1,0 +1,24 @@
+# Challenge brief: kept locally, not redistributed
+docs/consigna.pdf
+
+# Environment files may hold secrets; only the template is versioned
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# OS and editors
+# Zone.Identifier: Windows metadata that shows up as a file when copying into WSL
+*:Zone.Identifier
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
