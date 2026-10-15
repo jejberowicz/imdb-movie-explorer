@@ -12,9 +12,25 @@ name: imdb-movie-explorer
 x-owner-url: &owner-url postgresql+psycopg://movies:${MOVIES_DB_PASSWORD:-movies-local-only}@db:5432/movies
 x-api-url: &api-url postgresql+psycopg://movies_api:${API_DB_PASSWORD:-api-local-only}@db:5432/movies
 
+# Every container: no Linux capabilities and no way to gain privileges (setuid binaries) after it starts. Each
+# one also gets a cap on memory and processes, so a leak or a fork bomb stays inside it.
+x-hardened: &hardened
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
 services:
   db:
     image: postgres:18.6-trixie
+    <<: *hardened
+    # The entrypoint starts as root: it takes ownership of the data directory and switches to the postgres user.
+    # Only what that needs is given back.
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    # Everything it writes goes to the volume, the socket directory and /tmp.
+    read_only: true
+    tmpfs: [/var/run/postgresql, /tmp]
+    mem_limit: 512m
+    pids_limit: 200
+    restart: unless-stopped
     environment:
       POSTGRES_DB: movies
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local-only}
@@ -39,6 +55,12 @@ services:
       context: ./backend
       target: runtime
     command: ["sh", "-c", "alembic upgrade head && flask --app app seed /data/IMDb_movies.csv.gz"]
+    <<: *hardened
+    read_only: true
+    tmpfs: [/tmp]
+    # The load holds the 85.855 clean rows in memory before writing them.
+    mem_limit: 1g
+    pids_limit: 64
     environment:
       DATABASE_URL: *owner-url
     volumes:
@@ -54,6 +76,13 @@ services:
     build:
       context: ./backend
       target: runtime
+    <<: *hardened
+    # Gunicorn keeps the heartbeat files of its workers in /tmp.
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 512m
+    pids_limit: 64
+    restart: unless-stopped
     environment:
       DATABASE_URL: *api-url
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
@@ -77,6 +106,14 @@ services:
   web:
     image: imdb-movie-explorer/web:local
     build: ./frontend
+    <<: *hardened
+    # nginx-unprivileged writes its pid and its temporary files in /tmp.
+    read_only: true
+    tmpfs: [/tmp]
+    mem_limit: 128m
+    # nginx starts one worker per CPU.
+    pids_limit: 128
+    restart: unless-stopped
     ports:
       - "${WEB_PORT:-8080}:8080"
     networks: [frontend]
