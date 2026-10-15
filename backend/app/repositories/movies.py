@@ -120,6 +120,11 @@ def country_counts(conn: Connection) -> list[tuple[str, int]]:
     return _item_counts(conn, movies.c.countries)
 
 
+def last_load_id(conn: Connection) -> int | None:
+    """The id of the last load: it changes only when the data changes."""
+    return conn.execute(select(func.max(load_runs.c.id))).scalar()
+
+
 def loaded_movies(conn: Connection) -> int:
     """Movies of the last load, or a count when there is no record of it."""
     loaded = conn.execute(select(load_runs.c.rows_loaded).order_by(load_runs.c.id.desc()).limit(1)).scalar()
