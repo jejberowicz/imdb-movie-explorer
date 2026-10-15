@@ -71,12 +71,21 @@
   outline: none;
 }
 
-.item[aria-checked='true'] {
-  color: var(--accent);
+/* A small dot in the color of the logo, instead of a check mark: it marks without shouting. */
+.item[aria-checked='true']::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-50%);
 }
 
-.item[aria-checked='true']::before {
-  content: '✓';
-  position: absolute;
-  left: 12px;
+@media (forced-colors: active) {
+  .item[aria-checked='true']::before {
+    background: Highlight;
+  }
 }

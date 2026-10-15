@@ -51,6 +51,23 @@ describe('dropdown menu', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('lets choose several, staying open after each one', async () => {
+    const onSelect = vi.fn()
+    render(<Dropdown label="Año" options={OPTIONS} multiple selected={[2000, 1990]} onSelect={onSelect} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Año' }))
+
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitemcheckbox', { name: '2000s' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemcheckbox', { name: '1990s' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Todas' })).toHaveAttribute('aria-checked', 'false')
+    await user.keyboard('{Enter}')
+    await user.click(screen.getByRole('menuitemcheckbox', { name: '1990s' }))
+
+    expect(onSelect.mock.calls).toEqual([[2000], [1990]])
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+  })
+
   it('offers commands as plain menu items, with none checked', async () => {
     const onSelect = vi.fn()
     render(
