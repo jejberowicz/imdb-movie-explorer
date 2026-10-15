@@ -13,6 +13,7 @@ HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
 }
+LOOPBACK = {"127.0.0.1", "::1"}
 # The JSON responses load nothing and can't be framed. Swagger UI (/docs) needs its own scripts, so it is left out.
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
 
@@ -33,9 +34,10 @@ def init_security(app: Flask, settings: Settings) -> None:
     )
 
     @limiter.request_filter
-    def health_checks() -> bool:
-        # Docker asks every few seconds; a limit there could mark a healthy API as down.
-        return request.path.startswith("/health")
+    def docker_health_checks() -> bool:
+        # Docker asks every few seconds from inside the container; a limit there could mark a healthy API as down.
+        # Only that one is exempt: through nginx, /health/ready is public and queries the database.
+        return request.path.startswith("/health") and request.remote_addr in LOOPBACK
 
     @app.after_request
     def security_headers(response: Response) -> Response:

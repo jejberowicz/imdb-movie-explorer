@@ -45,9 +45,17 @@ def test_too_many_requests_get_a_429_with_retry_after(sample_db: Engine, databas
     assert int(response.headers["Retry-After"]) > 0
 
 
-def test_health_checks_are_never_limited(sample_db: Engine, database_url: str) -> None:
+def test_the_docker_health_check_is_never_limited(sample_db: Engine, database_url: str) -> None:
     client = make_client(database_url, rate_limit="1 per minute")
     assert {client.get("/health/ready").status_code for _ in range(5)} == {200}
+
+
+def test_health_checks_from_outside_are_limited(sample_db: Engine, database_url: str) -> None:
+    """Through nginx /health/ready is public, and it queries the database."""
+    client = make_client(database_url, rate_limit="1 per minute")
+    outside = {"REMOTE_ADDR": "203.0.113.9"}
+    statuses = [client.get("/health/ready", environ_base=outside).status_code for _ in range(2)]
+    assert statuses == [200, 429]
 
 
 @pytest.mark.parametrize(("proxy_hops", "separate"), [(1, True), (0, False)])
