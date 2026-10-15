@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { genreLabel } from './genres'
 import { COLORS, familyOf, posterDesign } from './poster'
 
 const movie = (id: string, title = 'The Godfather', genres = ['Crime', 'Drama']) => ({
@@ -27,6 +28,15 @@ describe('generated posters', () => {
     expect(familyOf(['Horror', 'Comedy'])).not.toBe(familyOf(['Comedy', 'Horror']))
     expect(posterDesign(movie('tt1', 'X', ['Comedy'])).colors).toEqual(COLORS.comedia)
     expect(familyOf(['Documentary-like genre that does not exist'])).toBe('otros')
+  })
+
+  it('treats names of built-in properties as unknown genres', () => {
+    for (const genre of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      expect(familyOf([genre])).toBe('otros')
+      expect(genreLabel(genre)).toBe(genre)
+      expect(posterDesign(movie('tt1', 'X', [genre])).colors).toEqual(COLORS.otros)
+    }
+    expect(genreLabel('Comedy')).toBe('Comedia')
   })
 
   it('makes the letters smaller as the title gets longer', () => {

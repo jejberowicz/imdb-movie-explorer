@@ -27,4 +27,6 @@ export const GENRES_ES: Record<string, string> = {
   News: 'Noticias',
 }
 
-export const genreLabel = (genre: string): string => GENRES_ES[genre] ?? genre
+// Object.hasOwn and not GENRES_ES[genre]: a genre called "constructor" or "toString" would otherwise find a
+// built-in function of every object and show its code.
+export const genreLabel = (genre: string): string => (Object.hasOwn(GENRES_ES, genre) ? GENRES_ES[genre] : genre)

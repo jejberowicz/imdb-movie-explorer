@@ -134,6 +134,12 @@ describe('browse page', () => {
     expect(searchOf(router)).toEqual({ genre: ['Animation'], year_from: ['2000'], year_to: ['2009'] })
   })
 
+  it('shows an odd genre of the URL as it comes, not as code', async () => {
+    renderApp('/?genre=constructor')
+    expect(await screen.findByText('No encontramos películas.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mejor valoradas · constructor')
+  })
+
   it('reads the state from the URL, so a search can be shared', async () => {
     const seen = recordMovieRequests()
     renderApp('/?genre=Crime&sort=year&order=asc')
