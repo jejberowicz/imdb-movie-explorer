@@ -127,6 +127,10 @@ class TestValidation:
             ("year_from=1700", "year_from"),
             ("min_votes=-1", "min_votes"),
             ("country=" + "x" * 61, "country.0"),
+            # A NUL byte reached PostgreSQL, which rejects it: it was a 500.
+            ("title=god%00father", "title"),
+            ("genre=Dr%00ama", "genre"),
+            ("country=USA&country=It%00aly", "country.1"),
         ],
     )
     def test_invalid_parameter_is_a_400_problem(self, client: FlaskClient, query: str, parameter: str) -> None:

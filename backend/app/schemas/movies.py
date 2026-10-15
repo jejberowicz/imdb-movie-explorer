@@ -1,18 +1,39 @@
 """Request and response models. Pydantic validates the requests and the same models document the API."""
 
+import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_serializer, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def no_control_characters(value: str) -> str:
+    """No title, genre or country has them, and PostgreSQL rejects a NUL: without this, «%00» would be a 500."""
+    if CONTROL_CHARACTERS.search(value):
+        raise ValueError("must not contain control characters")
+    return value
+
+
+Text = Annotated[str, AfterValidator(no_control_characters)]
 SortField = Literal["relevance", "rating", "year", "votes", "duration", "title"]
-CountryName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+CountryName = Annotated[Text, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 
 
 class MovieListQuery(BaseModel):
     # Unknown parameters are ignored (ADR 0007).
     model_config = ConfigDict(extra="ignore")
 
-    title: str | None = Field(
+    title: Text | None = Field(
         default=None,
         max_length=200,
         description="Text anywhere in the original or the Italian title, ignoring case and accents.",
@@ -23,7 +44,7 @@ class MovieListQuery(BaseModel):
         default=None, description="Default: relevance with a title, the weighted rating without one."
     )
     order: Literal["asc", "desc"] | None = Field(default=None, description="Default: asc for title, desc otherwise.")
-    genre: str | None = Field(default=None, min_length=1, max_length=40, description="A genre of GET /genres.")
+    genre: Text | None = Field(default=None, min_length=1, max_length=40, description="A genre of GET /genres.")
     country: list[CountryName] = Field(
         default_factory=list,
         max_length=20,
