@@ -1,0 +1,539 @@
+{
+  "info": {
+    "name": "IMDb Movie Explorer API",
+    "description": "Pedidos de ejemplo de la API. La URL base se cambia en la variable baseUrl. Cada pedido tiene un test con el código de respuesta esperado.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Películas",
+      "item": [
+        {
+          "name": "Lista: la primera página, por rating ponderado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar por título original",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?title=relatos salvajes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "title",
+                  "value": "relatos salvajes"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar sin acentos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?title=amelie",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "title",
+                  "value": "amelie"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar por el título italiano",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?title=padrino",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "title",
+                  "value": "padrino"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filtros y orden",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?genre=Crime&year_from=1990&year_to=1999&sort=votes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "genre",
+                  "value": "Crime"
+                },
+                {
+                  "key": "year_from",
+                  "value": "1990"
+                },
+                {
+                  "key": "year_to",
+                  "value": "1999"
+                },
+                {
+                  "key": "sort",
+                  "value": "votes"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "País repetible: Rusia y la Unión Soviética",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?country=Russia&country=Soviet Union",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "Russia"
+                },
+                {
+                  "key": "country",
+                  "value": "Soviet Union"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Paginación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?page=2&page_size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "2"
+                },
+                {
+                  "key": "page_size",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Detalle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies/tt0068646",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies",
+                "tt0068646"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catálogo",
+      "item": [
+        {
+          "name": "Géneros",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/genres",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "genres"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Países",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/countries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "countries"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Salud",
+      "item": [
+        {
+          "name": "Liveness",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Readiness",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "ready"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Errores",
+      "item": [
+        {
+          "name": "page_size fuera de rango",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?page_size=100000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "page_size",
+                  "value": "100000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Inyección en sort",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?sort=title;DROP TABLE movies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "title;DROP TABLE movies"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Id mal formado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Película inexistente",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies/tt9999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies",
+                "tt9999999"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
