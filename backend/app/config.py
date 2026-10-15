@@ -3,6 +3,8 @@
 import os
 from dataclasses import dataclass
 
+from limits import parse_many
+
 DEFAULT_DATABASE_URL = "postgresql+psycopg://movies:movies@localhost:5432/movies"
 
 
@@ -15,6 +17,14 @@ class Settings:
     # Proxies in front of the API that add X-Forwarded-For (nginx in Docker: 1). With 0, the client IP is the
     # one of the connection; trusting the header without a proxy would let anyone fake their IP.
     proxy_hops: int = 0
+
+    def __post_init__(self) -> None:
+        # Flask-Limiter parses the limit on each request: a typo would make every one a 500, and an empty value
+        # would turn the limit off in silence. Better not to start.
+        try:
+            parse_many(self.rate_limit)
+        except ValueError as error:
+            raise ValueError(f"Invalid RATE_LIMIT {self.rate_limit!r} ({error}); e.g. '300 per minute'.") from None
 
     @classmethod
     def from_env(cls) -> "Settings":

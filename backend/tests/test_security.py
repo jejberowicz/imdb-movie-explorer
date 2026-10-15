@@ -45,6 +45,19 @@ def test_too_many_requests_get_a_429_with_retry_after(sample_db: Engine, databas
     assert int(response.headers["Retry-After"]) > 0
 
 
+@pytest.mark.parametrize("rate_limit", ["300 per minut", "", "  "])
+def test_an_invalid_rate_limit_stops_the_start(rate_limit: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A typo made every request a 500, and an empty value turned the limit off."""
+    monkeypatch.setenv("RATE_LIMIT", rate_limit)
+    with pytest.raises(ValueError, match="Invalid RATE_LIMIT"):
+        Settings.from_env()
+
+
+def test_several_limits_are_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RATE_LIMIT", "300 per minute; 20 per second")
+    assert Settings.from_env().rate_limit == "300 per minute; 20 per second"
+
+
 def test_the_docker_health_check_is_never_limited(sample_db: Engine, database_url: str) -> None:
     client = make_client(database_url, rate_limit="1 per minute")
     assert {client.get("/health/ready").status_code for _ in range(5)} == {200}
