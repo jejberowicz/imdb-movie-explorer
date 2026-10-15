@@ -26,8 +26,9 @@ SORT_COLUMNS = {
     "year": movies.c.year,
     "votes": movies.c.votes,
     "duration": movies.c.duration,
-    # Folded title in byte order: the same A-Z everywhere, whatever the collation of the database.
-    "title": movies.c.original_title_search.collate("C"),
+    # Folded title without its leading symbols, in byte order: the same A-Z everywhere, whatever the collation of
+    # the database. The titles made only of symbols have no key and go last either way (nulls_last below).
+    "title": movies.c.title_sort.collate("C"),
 }
 
 
@@ -84,7 +85,7 @@ def find_movies(
         order = [relevance(filters.title).desc()]
     else:
         column = SORT_COLUMNS[sort]
-        order = [column.desc() if descending else column.asc()]
+        order = [(column.desc() if descending else column.asc()).nulls_last()]
     # The id breaks ties, so the pagination is stable: no movie shows up on two pages.
     order.append(movies.c.imdb_title_id.asc())
 

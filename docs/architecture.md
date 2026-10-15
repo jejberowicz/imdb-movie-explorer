@@ -76,7 +76,8 @@ backend/
     countries.py        nombre del país en el CSV → código ISO donde se pinta en el mapa
     text.py             plegado del texto, el mismo para la carga y para la búsqueda
     etl/                parseo, reglas del ADR 0003 y comando seed
-  migrations/           Alembic; la 0004 da a la API permiso de lectura sobre sus dos tablas
+  migrations/           Alembic; la 0004 da a la API permiso de lectura sobre sus dos tablas, y la 0005
+                        agrega la clave del orden alfabético
   scripts/              EXPLAIN de las consultas y medición de p50 y p95
   tests/                parseo, carga, API, seguridad, criterios de aceptación y fixtures/ (CSV chicos)
   Dockerfile
@@ -133,6 +134,7 @@ React con TypeScript y Vite.
 | `original_title` | `text` | `NOT NULL`. Es el título que se muestra |
 | `italian_title` | `text` | `NOT NULL`. Es la columna `title` del CSV |
 | `original_title_search`, `italian_title_search` | `text` | `NOT NULL`. Los títulos plegados: minúsculas, sin acentos y con ø, æ, ð y þ convertidas |
+| `title_sort` | `text` | Columna generada: `original_title_search` sin los símbolos del principio, la clave del orden alfabético. `NULL` si el título es solo símbolos, y esos van al final |
 | `year` | `smallint` | `NOT NULL`, `CHECK` entre 1880 y 2100. El límite del año actual lo aplica la carga (regla 1): un `CHECK` no puede depender de la fecha |
 | `genres` | `text[]` | `NOT NULL`, al menos uno. El CSV trae hasta 3, pero un `CHECK` con máximo rechazaría una película válida si un CSV futuro trajera más |
 | `duration` | `smallint` | `NOT NULL`, minutos, `CHECK > 0` |

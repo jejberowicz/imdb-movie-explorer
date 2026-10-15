@@ -65,6 +65,8 @@ Con ese CSV se prueba:
   IP detrás del proxy.
 - `GET /genres` y `GET /countries` devuelven sus cantidades y se pueden cachear; `country` repetido devuelve
   las películas de cualquiera de esos países.
+- El orden alfabético saltea los símbolos del principio del título y deja al final, en los dos sentidos, los
+  títulos hechos solo de símbolos.
 
 ### Aceptación: contra el CSV completo
 

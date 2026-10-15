@@ -2,6 +2,7 @@
 
 import socket
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
 from flask.testing import FlaskClient
@@ -9,11 +10,17 @@ from sqlalchemy import Connection, Engine, text
 
 from app import create_app
 from app.config import Settings
+from app.etl.load import load
 from app.text import fold
+from tests.test_load import write_csv
 
 
 def ids(response) -> list[str]:
-    return [movie["imdb_title_id"] for movie in response.get_json()["items"]]
+    return ids_of(response.get_json())
+
+
+def ids_of(body: dict) -> list[str]:
+    return [movie["imdb_title_id"] for movie in body["items"]]
 
 
 class TestList:
@@ -119,6 +126,45 @@ class TestFiltersAndOrder:
         if key == "original_title":
             values = [fold(value) for value in values]
         assert values == sorted(values, reverse=reverse)
+
+
+class TestAlphabeticalOrder:
+    TITLES = ("Zodiac", "#Alive", "$", "Amélie", "(500) Days of Summer", "¡Three Amigos!", "'71")
+
+    @pytest.fixture
+    def titles_client(self, empty_db: Engine, database_url: str, tmp_path: Path) -> FlaskClient:
+        rows = ({"imdb_title_id": f"tt90007{n:02d}", "original_title": title} for n, title in enumerate(self.TITLES))
+        load(empty_db, write_csv(tmp_path / "titles.csv", *rows))
+        app = create_app(Settings(database_url=database_url))
+        app.config["TESTING"] = True
+        return app.test_client()
+
+    def titles(self, client: FlaskClient, order: str) -> list[str]:
+        items = client.get(f"/movies?sort=title&order={order}").get_json()["items"]
+        return [movie["original_title"] for movie in items]
+
+    def test_the_symbols_at_the_start_are_skipped(self, titles_client: FlaskClient) -> None:
+        """«#Alive» goes with the A, not before every letter; a title of symbols only goes last."""
+        assert self.titles(titles_client, "asc") == [
+            "(500) Days of Summer",
+            "'71",
+            "#Alive",
+            "Amélie",
+            "¡Three Amigos!",
+            "Zodiac",
+            "$",
+        ]
+
+    def test_a_title_of_symbols_only_is_last_either_way(self, titles_client: FlaskClient) -> None:
+        assert self.titles(titles_client, "desc") == [
+            "Zodiac",
+            "¡Three Amigos!",
+            "Amélie",
+            "#Alive",
+            "'71",
+            "(500) Days of Summer",
+            "$",
+        ]
 
 
 class TestValidation:

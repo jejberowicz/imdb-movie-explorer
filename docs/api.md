@@ -36,6 +36,9 @@ Devuelve una página de películas. Con `title`, filtra por título.
 - **Relevancia:** combina la popularidad con qué tan bien coincide el título. Es el logaritmo de los votos, más
   2 si un título es igual al texto buscado y 1 si empieza con él. Así *The Godfather* (1,5 millones de votos)
   sale antes que una película llamada exactamente «Godfather» (2.839 votos).
+- **Orden alfabético:** compara el título original sin acentos ni mayúsculas y sin los símbolos del principio:
+  «#Alive» va con la A y «¡Three Amigos!» con la T, en lugar de ir todos antes de la A. Un título hecho solo de
+  símbolos, como «$», queda al final en los dos sentidos.
 - **Desempates:** todo orden termina en `imdb_title_id`, así la paginación es estable.
 - **Parámetros desconocidos:** se ignoran.
 
