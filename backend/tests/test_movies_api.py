@@ -1,8 +1,11 @@
 """The API against the sample of 16 movies: list, search, filters, order, detail, catalog, health and errors."""
 
+import socket
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from flask.testing import FlaskClient
-from sqlalchemy import Engine
+from sqlalchemy import Connection, Engine, text
 
 from app import create_app
 from app.config import Settings
@@ -245,3 +248,43 @@ class TestErrors:
         assert response.status_code == 500
         assert "secret" not in response.get_data(as_text=True)
         assert response.get_json()["detail"] == "Unexpected error."
+
+
+class TestDatabaseErrors:
+    """The database down or too slow is a 503 with one log line, not a 500 with a traceback per request."""
+
+    def test_database_down_is_a_503(self, caplog: pytest.LogCaptureFixture) -> None:
+        client = create_app(
+            Settings(database_url="postgresql+psycopg://nobody:wrong@127.0.0.1:9/nothing")
+        ).test_client()
+        response = client.get("/movies")
+        assert response.status_code == 503
+        assert response.mimetype == "application/problem+json"
+        assert response.get_json()["detail"] == "The database is not available."
+        [record] = [record for record in caplog.records if record.name == "app.errors"]
+        assert record.exc_info is None
+        assert "\n" not in record.getMessage()
+
+    def test_a_query_over_the_statement_timeout_is_a_503(self, client: FlaskClient, monkeypatch) -> None:
+        def slow(conn: Connection, *args, **kwargs):
+            conn.execute(text("SET LOCAL statement_timeout = '50ms'"))
+            conn.execute(text("SELECT pg_sleep(1)"))
+
+        monkeypatch.setattr("app.repositories.movies.find_movies", slow)
+        assert client.get("/movies").status_code == 503
+
+    def test_a_database_that_never_answers_times_out(self, monkeypatch) -> None:
+        """Without connect_timeout, libpq waits forever and the request ties up a worker until Gunicorn kills it."""
+        monkeypatch.setattr("app.db.CONNECT_TIMEOUT", 2, raising=False)  # the minimum of libpq
+        silent = socket.socket()
+        silent.bind(("127.0.0.1", 0))
+        silent.listen()  # the kernel accepts the connection, nobody answers
+        url = f"postgresql+psycopg://a:b@127.0.0.1:{silent.getsockname()[1]}/c"
+        pool = ThreadPoolExecutor(1)
+        try:
+            client = create_app(Settings(database_url=url)).test_client()
+            response = pool.submit(client.get, "/movies").result(timeout=10)
+        finally:
+            silent.close()  # a connection still waiting gets a reset, so the thread ends
+            pool.shutdown()
+        assert response.status_code == 503
