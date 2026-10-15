@@ -1,7 +1,11 @@
 """Movie use cases. No HTTP here: the routes translate requests and responses."""
 
 import math
+from collections.abc import Callable
 from typing import Any
+
+from flask import current_app
+from sqlalchemy import Connection
 
 from ..countries import FORMER, map_code
 from ..db import get_engine
@@ -64,15 +68,28 @@ def get_movie(imdb_title_id: str) -> MovieDetail | None:
     )
 
 
-def list_genres() -> GenreList:
+def _per_load[T](name: str, compute: Callable[[Connection], T]) -> T:
+    """The result of `compute`, kept until the next load: genres and countries only change with new data, and
+    counting them takes ~40 ms over the 85.855 movies, while asking for the last load takes a fraction of 1 ms."""
+    cache: dict[str, tuple[int, Any]] = current_app.extensions.setdefault("per_load_cache", {})
     with get_engine().connect() as conn:
-        counts = repository.genre_counts(conn)
+        load_id = repository.last_load_id(conn)
+        cached = cache.get(name)
+        if load_id is not None and cached is not None and cached[0] == load_id:
+            return cached[1]
+        value = compute(conn)
+    if load_id is not None:
+        cache[name] = (load_id, value)
+    return value
+
+
+def list_genres() -> GenreList:
+    counts = _per_load("genres", repository.genre_counts)
     return GenreList(items=[GenreCount(name=name, movies=count) for name, count in counts])
 
 
 def list_countries() -> CountryList:
-    with get_engine().connect() as conn:
-        counts = repository.country_counts(conn)
+    counts = _per_load("countries", repository.country_counts)
     return CountryList(
         items=[
             CountryCount(name=name, movies=count, map_code=map_code(name), former=name in FORMER)

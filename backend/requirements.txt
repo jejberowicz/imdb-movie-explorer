@@ -1,17 +1,23 @@
 # Runtime dependencies, fully pinned (pip freeze of a clean install).
-# Direct: flask, flask-openapi3, flask-openapi3-swagger, pydantic, sqlalchemy, psycopg[binary], alembic, gunicorn.
+# Direct: flask, flask-openapi3, flask-openapi3-swagger, flask-limiter, pydantic, sqlalchemy, psycopg[binary], alembic,
+# gunicorn.
 alembic==1.20.0
 annotated-types==0.8.0
 blinker==1.9.0
 click==8.5.0
+Deprecated==3.0.0
 Flask==3.1.3
+Flask-Limiter==4.1.1
 flask-openapi3==4.3.2
 flask-openapi3-swagger==5.31.0
 gunicorn==26.2.0
 itsdangerous==2.2.0
 Jinja2==3.1.6
+limits==5.8.0
 Mako==1.4.3
 MarkupSafe==3.0.4
+ordered-set==4.1.0
+packaging==26.3
 psycopg==3.3.6
 psycopg-binary==3.3.6
 pydantic==2.14.1
@@ -20,3 +26,4 @@ SQLAlchemy==2.1.4
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 Werkzeug==3.1.9
+wrapt==2.5.1

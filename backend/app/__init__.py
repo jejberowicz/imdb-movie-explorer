@@ -9,6 +9,7 @@ from .config import Settings
 from .db import init_engine
 from .errors import Problem, register_error_handlers, validation_problem
 from .etl.cli import seed_command
+from .security import init_security
 
 
 def create_app(settings: Settings | None = None) -> OpenAPI:
@@ -30,6 +31,7 @@ def create_app(settings: Settings | None = None) -> OpenAPI:
     app.json.ensure_ascii = False
     init_engine(app, settings.database_url)
     register_error_handlers(app)
+    init_security(app, settings)
     app.register_api(health_bp)
     app.register_api(movies_bp)
     app.register_api(catalog_bp)
