@@ -46,8 +46,9 @@ Valores que parecen «sin dato» (-, ?, n/a, na, nan, none, null, unknown), por 
 - `title`: "?" ×1 (p. ej. `tt0775413`).
 - `original_title`: "Unknown" ×2, "?" ×1 (p. ej. `tt0450340`, `tt0775413`, `tt1401152`).
 - `language`: "None" ×68 (p. ej. `tt0000009`, `tt0000574`, `tt0004972`).
+- Dentro de una lista, junto a otros valores: "None" en 28 filas de `language`.
 
-Revisados a mano: en los títulos son películas reales (*Unknown*, de 2006 y de 2011, y una llamada *?*).
+Revisados a mano: en los títulos son películas reales (*Unknown*, de 2006 y de 2011, y una llamada *?*). De las 68 filas con `language` = "None", 12 son anteriores a 1930, la época del cine mudo.
 
 ## Clave y duplicados
 
@@ -66,6 +67,7 @@ Revisados a mano: en los títulos son películas reales (*Unknown*, de 2006 y de
 | tt3011894 | Storie Pazzesche | Relatos salvajes |
 
 - Títulos con caracteres no ASCII: 7.239 en `title`, 7.566 en `original_title`.
+- Letras latinas que el plegado no simplifica, porque NFKD no las descompone: ø ×384, æ ×190, ð ×50, þ ×8, en 295 filas (p. ej. "Æon Flux", "Død snø", "Adams æbler").
 
 Resultados de cada búsqueda (substring) según la estrategia. «Plegado» = sin mayúsculas ni acentos.
 
@@ -79,6 +81,7 @@ Resultados de cada búsqueda (substring) según la estrategia. «Plegado» = sin
 - `%`: lo contienen 10 títulos (p. ej. "99 and 44/100% Dead!", "Brasília 18%", "Wool 100%"); buscarlo sin escapar el comodín devuelve 85.855.
 - `_`: lo contienen 7 títulos (p. ej. "E_mail", "On_Line", "Un_seduttore_in_incognito"); buscarlo sin escapar el comodín devuelve 85.855.
 - Título más largo: 196 caracteres en `title` (`tt0475343`), 196 caracteres en `original_title` (`tt0475343`).
+- Largo de los títulos: `title`, promedio 17,0, percentil 99 46, 3 con más de 100 caracteres; `original_title`, promedio 15,7, percentil 99 44, 6 con más de 100 caracteres.
 - Títulos de menos de 3 caracteres: 141, entre ellos "Up", "X2", "It", "21", "Us", "Pi", "PK", "9".
 
 ## Año y fecha
@@ -152,6 +155,7 @@ Top 5 por rating ponderado:
 | 5 | Pulp Fiction (1994) | 8,9 | 1.780.147 | 8,88 |
 
 - *Suvarna Sundari*, primera por `avg_vote` crudo, queda en el puesto 8.439 con el rating ponderado.
+- De las 20 primeras por rating ponderado, 13 tienen un `title` (italiano) distinto de `original_title`.
 
 ## Calidad de texto
 
@@ -164,6 +168,7 @@ Top 5 por rating ponderado:
 | `description` | espacios no estándar (NBSP, etc.) | 5 | `tt0399445`: "…his older brother Freddy.<U+00A0> Raul's destiny as a memb…" |
 | `description` | espacios dobles | 3 | `tt0019312`: "Note: Contains Spoilers  The story, set in Russia …" |
 
+- Descripciones con algún problema de codificación (mojibake, U+FFFD o espacios no estándar): 14 distintas. El mojibake se revierte volviendo a codificar en Windows-1252 o Latin-1 y decodificando como UTF-8 en 7 de 9.
 - Sin ninguno de estos problemas: `title`, `original_title`, `genre`, `country`, `language`, `director`, `writer`, `production_company`, `actors`.
 - Valores que empiezan con `=`, `+`, `-`, `@`, tabulación o retorno de carro (una planilla los ejecuta como fórmulas al abrir un CSV exportado): 4 en `title`, 4 en `original_title`, 8 en `description`, 2 en `production_company`.
 - Valores con URLs: 0 (no hay posters).

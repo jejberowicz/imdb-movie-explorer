@@ -68,6 +68,6 @@ Opción 3: `scripts/profile_dataset.py` genera `docs/data-profile.md`.
   listas, títulos reales que parecen nulos (*Unknown*, *?*) y descripciones con problemas de codificación.
   Las decisiones que salen de esto están en los ADR [0003](0003-data-cleaning-rules.md) y
   [0004](0004-title-search-requirements.md).
-- Es el doble de largo que la primera versión (unas 650 líneas contra 320) y tarda unos 10 segundos.
+- Es más del doble de largo que la primera versión (unas 700 líneas contra 320) y tarda unos 10 segundos.
 - El perfilado y la carga tienen código de parseo separado: el perfilado describe lo que hay y la carga
   aplica las reglas decididas. La aplicación no importa nada de `scripts/`.

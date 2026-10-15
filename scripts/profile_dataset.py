@@ -42,14 +42,19 @@ PRE_EURO_CURRENCIES = {"ATS", "BEF", "DEM", "ESP", "FIM", "FRF", "GRD", "IEP", "
 COMMA_NAMES = {"Greek, Ancient (to 1453)", "Norse, Old"}
 SEARCH_PROBES = ["shawshank", "godfather", "relatos salvajes", "amelie"]
 TITLE_EXAMPLES = {"tt0068646", "tt0111161", "tt3011894"}
+# UTF-8 text that was decoded as Latin-1 or Windows-1252: "é" shows up as "Ã©".
+MOJIBAKE = re.compile(r"Ã[\x80-\xbf]|Â[\x80-\xbf]|â€")
 # Each check returns a match (or True) when the text has the problem.
-TEXT_ISSUES: dict[str, Callable[[str], object]] = {
-    "mojibake (UTF-8 leído como Latin-1)": re.compile(r"Ã[\x80-\xbf]|Â[\x80-\xbf]|â€").search,
+ENCODING_ISSUES: dict[str, Callable[[str], object]] = {
+    "mojibake (UTF-8 leído como Latin-1)": MOJIBAKE.search,
     "carácter de reemplazo U+FFFD": re.compile(r"\N{REPLACEMENT CHARACTER}").search,
     "espacios no estándar (NBSP, etc.)": re.compile(
         r"[\N{NO-BREAK SPACE}\N{EN QUAD}-\N{ZERO WIDTH SPACE}\N{NARROW NO-BREAK SPACE}"
         r"\N{MEDIUM MATHEMATICAL SPACE}\N{IDEOGRAPHIC SPACE}]"
     ).search,
+}
+TEXT_ISSUES: dict[str, Callable[[str], object]] = {
+    **ENCODING_ISSUES,
     "caracteres de control": re.compile(r"[\x00-\x08\x0b-\x1f\x7f]").search,
     "espacios al inicio o al final": re.compile(r"^\s|\s$").search,
     "espacios dobles": re.compile(r"  ").search,
@@ -181,6 +186,18 @@ def like_without_escaping(query: str) -> re.Pattern[str]:
     """Regex equivalent to ILIKE '%' || query || '%' when % and _ in the query are not escaped."""
     regex = "".join(".*" if c == "%" else "." if c == "_" else re.escape(c) for c in f"%{query}%")
     return re.compile(regex, re.IGNORECASE | re.DOTALL)
+
+
+def unmojibake(text: str) -> str | None:
+    """Undo UTF-8 that was decoded as Windows-1252 or Latin-1, or None if that doesn't reverse it cleanly."""
+    for codec in ("cp1252", "latin-1"):
+        try:
+            fixed = text.encode(codec).decode("utf-8")
+        except UnicodeError:
+            continue
+        if not MOJIBAKE.search(fixed):
+            return fixed
+    return None
 
 
 def votes_of(row: Row) -> int:
@@ -324,9 +341,21 @@ def section_null_tokens(header: list[str], rows: list[Row]) -> list[str]:
             counts = ", ".join(f"{quote(v)} ×{fmt(n)}" for v, n in Counter(r[col] for r in hits).items())
             ids = ", ".join(f"`{r['imdb_title_id']}`" for r in hits[:3])
             lines.append(f"- `{col}`: {counts} (p. ej. {ids}).")
+    inside: list[str] = []
+    for col in LIST_COLUMNS:
+        tokens: Counter[str] = Counter()
+        for r in rows:
+            if r[col].strip().casefold() not in NULL_TOKENS:
+                tokens.update({item for item in parse_list(r[col]) or [] if item.casefold() in NULL_TOKENS})
+        inside += [f"{quote(token)} en {fmt(n)} filas de `{col}`" for token, n in sorted(tokens.items())]
+    silent = [r for r in rows if r["language"] == "None"]
+    before_1930 = sum(1 for r in silent if (year := parse_year(r["year"])) is not None and year < 1930)
     return lines + [
+        f"- Dentro de una lista, junto a otros valores: {', '.join(inside) or 'ninguno'}.",
         "",
-        "Revisados a mano: en los títulos son películas reales (*Unknown*, de 2006 y de 2011, y una llamada *?*).",
+        "Revisados a mano: en los títulos son películas reales (*Unknown*, de 2006 y de 2011, y una llamada *?*). "
+        f'De las {fmt(len(silent))} filas con `language` = "None", {fmt(before_1930)} son anteriores a 1930, '
+        "la época del cine mudo.",
         "",
     ]
 
@@ -348,9 +377,18 @@ def section_keys(rows: list[Row]) -> list[str]:
     ]
 
 
+def kept_letters(text: str) -> list[str]:
+    """Latin letters that folding leaves non-ASCII, because NFKD doesn't decompose them (ø, æ…)."""
+    return [c for c in fold(text) if not c.isascii() and "LATIN" in unicodedata.name(c, "")]
+
+
 def section_titles(rows: list[Row]) -> list[str]:
     differ = sum(1 for r in rows if r["title"] != r["original_title"])
     folded = [(fold(r["title"]), fold(r["original_title"])) for r in rows]
+    kept = Counter(c for r in rows for col in ("title", "original_title") for c in kept_letters(r[col]))
+    kept_rows = sorted(
+        (r for r in rows if kept_letters(r["title"]) or kept_letters(r["original_title"])), key=votes_of, reverse=True
+    )
     lines = [
         "## Títulos y búsqueda",
         "",
@@ -368,6 +406,9 @@ def section_titles(rows: list[Row]) -> list[str]:
         "- Títulos con caracteres no ASCII: "
         f"{fmt(sum(1 for r in rows if not r['title'].isascii()))} en `title`, "
         f"{fmt(sum(1 for r in rows if not r['original_title'].isascii()))} en `original_title`.",
+        "- Letras latinas que el plegado no simplifica, porque NFKD no las descompone: "
+        + ", ".join(f"{c} ×{fmt(n)}" for c, n in kept.most_common())
+        + f", en {fmt(len(kept_rows))} filas (p. ej. {', '.join(quote(r['original_title']) for r in kept_rows[:3])}).",
         "",
         "Resultados de cada búsqueda (substring) según la estrategia. «Plegado» = sin mayúsculas ni acentos.",
         "",
@@ -395,10 +436,18 @@ def section_titles(rows: list[Row]) -> list[str]:
             f"buscarlo sin escapar el comodín devuelve {fmt(matched)}."
         )
     longest = {col: max(rows, key=lambda r: len(r[col])) for col in ("title", "original_title")}
+    lengths = {col: [len(r[col]) for r in rows] for col in ("title", "original_title")}
     short = sorted((r for r in rows if len(r["original_title"]) < 3), key=votes_of, reverse=True)
     lines += [
         "- Título más largo: "
         + ", ".join(f"{len(r[col])} caracteres en `{col}` (`{r['imdb_title_id']}`)" for col, r in longest.items())
+        + ".",
+        "- Largo de los títulos: "
+        + "; ".join(
+            f"`{col}`, promedio {dec(statistics.fmean(values))}, percentil 99 {fmt(percentile(values, 99))}, "
+            f"{fmt(sum(1 for n in values if n > 100))} con más de 100 caracteres"
+            for col, values in lengths.items()
+        )
         + ".",
         f"- Títulos de menos de 3 caracteres: {fmt(len(short))}, entre ellos "
         f"{', '.join(quote(r['original_title']) for r in short[:8])}.",
@@ -537,6 +586,8 @@ def section_rating(rows: list[Row]) -> list[str]:
     by_wr = sorted(rated, key=lambda x: -wr(x[1], x[2]))
     raw_top = by_avg[0][0]
     raw_top_rank = next(i for i, (r, _, _) in enumerate(by_wr, 1) if r is raw_top)
+    first_page = by_wr[:20]
+    italian = sum(1 for r, _, _ in first_page if r["title"] != r["original_title"])
     under_500 = sum(1 for v in votes_sorted if v < 500)
     return [
         "## Votos y rating ponderado",
@@ -557,6 +608,8 @@ def section_rating(rows: list[Row]) -> list[str]:
         "",
         f"- *{cell(raw_top['original_title'])}*, primera por `avg_vote` crudo, "
         f"queda en el puesto {fmt(raw_top_rank)} con el rating ponderado.",
+        f"- De las {len(first_page)} primeras por rating ponderado, {italian} tienen un `title` (italiano) "
+        "distinto de `original_title`.",
         "",
     ]
 
@@ -579,6 +632,9 @@ def section_text_quality(header: list[str], rows: list[Row]) -> list[str]:
             clean.append(col)
     formula = Counter(col for r in rows for col in header if r[col].startswith(FORMULA_PREFIXES))
     urls = sum(1 for r in rows for v in r.values() if "http" in v)
+    damaged = [r for r in rows if any(check(r["description"]) for check in ENCODING_ISSUES.values())]
+    mojibake = [r for r in rows if MOJIBAKE.search(r["description"])]
+    reversible = sum(1 for r in mojibake if unmojibake(r["description"]) is not None)
     return [
         "## Calidad de texto",
         "",
@@ -588,6 +644,9 @@ def section_text_quality(header: list[str], rows: list[Row]) -> list[str]:
         "|---|---|---:|---|",
         *findings,
         "",
+        "- Descripciones con algún problema de codificación (mojibake, U+FFFD o espacios no estándar): "
+        f"{fmt(len(damaged))} distintas. El mojibake se revierte volviendo a codificar en Windows-1252 o "
+        f"Latin-1 y decodificando como UTF-8 en {fmt(reversible)} de {fmt(len(mojibake))}.",
         f"- Sin ninguno de estos problemas: {', '.join(f'`{col}`' for col in clean)}.",
         "- Valores que empiezan con `=`, `+`, `-`, `@`, tabulación o retorno de carro "
         "(una planilla los ejecuta como fórmulas al abrir un CSV exportado): "
