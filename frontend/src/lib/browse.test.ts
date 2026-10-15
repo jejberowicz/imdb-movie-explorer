@@ -23,6 +23,29 @@ describe('browse state in the URL', () => {
     expect(read('page=0').page).toBe(1)
   })
 
+  it('keeps every value within the limits of the API, so a shared URL never ends in a 400', () => {
+    expect(read('page=100001').page).toBe(100000)
+    // Number('1000…000') is 1e+23, which the URL would carry as is.
+    expect(read(`page=1${'0'.repeat(23)}`).page).toBe(100000)
+    expect(read('year_from=1700&year_to=3000')).toMatchObject({ yearFrom: 1880, yearTo: 2100 })
+    expect(read('year_from=1999&year_to=1990')).toMatchObject({ yearFrom: 1990, yearTo: 1999 })
+    expect(read(`q=${'a'.repeat(250)}`).q).toHaveLength(200)
+    expect(read('q=ma%00trix').q).toBe('matrix')
+    expect(read(`genre=${'g'.repeat(41)}`).genre).toBeUndefined()
+    expect(read('genre=Drama').genre).toBe('Drama')
+    const many = Array.from({ length: 25 }, (_, index) => `country=C${index}`).join('&')
+    expect(read(many).countries).toHaveLength(20)
+    expect(read(`country=${'x'.repeat(61)}&country=+USA+&country=+`).countries).toEqual(['USA'])
+  })
+
+  it('drops the order by relevance without a search', () => {
+    expect(read('sort=relevance').sort).toBeUndefined()
+    expect(read('q=+&sort=relevance').sort).toBeUndefined()
+    expect(read('q=matrix&sort=relevance').sort).toBe('relevance')
+    // Clearing the search of a URL ordered by relevance.
+    expect(writeBrowseState({ ...read('q=matrix&sort=relevance'), q: '' }).toString()).toBe('')
+  })
+
   it('writes only what differs from the default, so the start page is just "/"', () => {
     expect(writeBrowseState(read('')).toString()).toBe('')
     expect(browsePath(read(''))).toBe('/')

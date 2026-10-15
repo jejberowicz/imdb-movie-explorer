@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
+import { ApiError } from '../api/client'
 import { fetchMovies } from '../api/movies'
 import { BrowseBar } from '../components/BrowseBar'
 import { MovieGrid } from '../components/MovieGrid'
@@ -86,9 +87,14 @@ export default function BrowsePage() {
         <LoadingBar visible={movies.isFetching && movies.isPlaceholderData} />
 
         {movies.isPending && <PosterSkeleton />}
-        {movies.isError && !data && (
-          <ErrorState message="No pudimos cargar las películas." onRetry={() => movies.refetch()} />
-        )}
+        {movies.isError &&
+          !data &&
+          // A 400 doesn't change by asking again: the way out is to start over.
+          (movies.error instanceof ApiError && movies.error.status === 400 ? (
+            <ErrorState message="No pudimos buscar con estos filtros." onClear={clear} />
+          ) : (
+            <ErrorState message="No pudimos cargar las películas." onRetry={() => movies.refetch()} />
+          ))}
         {data && data.items.length === 0 && (
           <EmptyState query={state.q.trim()} onClear={hasFilters(state) ? clear : undefined} />
         )}

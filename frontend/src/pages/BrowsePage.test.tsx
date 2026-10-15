@@ -117,6 +117,31 @@ describe('browse page', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('offers to clear the filters when the API rejects them, since retrying would fail again', async () => {
+    server.use(http.get('/api/movies', () => problem(400, 'Invalid request parameters.'), { once: true }))
+    const { router, user } = renderApp('/?genre=Drama')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos buscar con estos filtros.')
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+    await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Limpiar filtros' }))
+
+    expect(await screen.findByRole('link', { name: 'Stalker (1979)' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+  })
+
+  it('stops ordering by relevance when the search is cleared', async () => {
+    const seen = recordMovieRequests()
+    const { router, user } = renderApp('/?q=godfather&sort=relevance')
+    await screen.findByRole('link', { name: 'The Godfather (1972)' })
+
+    await user.clear(searchBox())
+
+    await waitFor(() => expect(cardNames()).toHaveLength(8))
+    expect(seen.at(-1)?.searchParams.get('sort')).toBeNull()
+    expect(searchOf(router)).toEqual({})
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('filters with the «Explorar por» menus', async () => {
     const { router, user } = renderApp()
     await screen.findByRole('link', { name: 'Stalker (1979)' })
