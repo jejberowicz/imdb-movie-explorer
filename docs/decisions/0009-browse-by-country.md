@@ -6,9 +6,9 @@
 ## Contexto
 
 La interfaz permite explorar las películas por país desde un mapa del mundo, coloreado según la cantidad de
-películas de cada uno. El CSV tiene 194 países, escritos como los escribe IMDb, en inglés, y 11 de ellos ya no
+películas de cada uno. El CSV tiene 194 países, escritos como los escribe IMDb, en inglés, y 13 de ellos ya no
 existen, ya sea porque se disolvieron o porque cambiaron de nombre (ver el [perfil](../data-profile.md)): West
-Germany (1.114 películas), Soviet Union (866), Yugoslavia (395), Czechoslovakia (313) y otros siete con menos
+Germany (1.114 películas), Soviet Union (866), Yugoslavia (395), Czechoslovakia (313) y otros nueve con menos
 de 100. Un mapa actual no tiene dónde pintarlos.
 
 ## Opciones
@@ -30,7 +30,8 @@ Opción 3. En el mapa, cada país histórico se suma a un sucesor:
 | Yugoslavia, Federal Republic of Yugoslavia, Serbia and Montenegro | Serbia, que continuó a esos Estados |
 | Czechoslovakia | República Checa |
 | Netherlands Antilles | Países Bajos |
-| Burma, Zaire | Myanmar y República Democrática del Congo: son los mismos países, con otro nombre |
+| North Vietnam | Vietnam |
+| Burma, Zaire, Swaziland | Myanmar, República Democrática del Congo y Esuatini: son los mismos países, con otro nombre |
 | Korea (una película de 1936, anterior a la división) | Corea del Sur |
 
 - **El mapa aclara qué suma cada país.** Muestra las películas de cada país más las de los históricos que se le

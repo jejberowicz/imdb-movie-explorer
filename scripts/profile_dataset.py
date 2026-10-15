@@ -44,7 +44,7 @@ COMMA_NAMES = {"Greek, Ancient (to 1453)", "Norse, Old"}
 # Country names that no longer exist (dissolved or renamed), reviewed by hand among the 194 in the CSV.
 FORMER_COUNTRIES = {
     "Burma", "Czechoslovakia", "East Germany", "Federal Republic of Yugoslavia", "Korea", "Netherlands Antilles",
-    "Serbia and Montenegro", "Soviet Union", "West Germany", "Yugoslavia", "Zaire",
+    "North Vietnam", "Serbia and Montenegro", "Soviet Union", "Swaziland", "West Germany", "Yugoslavia", "Zaire",
 }
 SEARCH_PROBES = ["shawshank", "godfather", "relatos salvajes", "amelie"]
 TITLE_EXAMPLES = {"tt0068646", "tt0111161", "tt3011894"}
