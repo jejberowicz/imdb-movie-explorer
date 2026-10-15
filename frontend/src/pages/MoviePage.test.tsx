@@ -1,6 +1,7 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { http } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { createQueryClient } from '../api/queryClient'
 import { renderApp } from '../test/render'
 import { problem, server } from '../test/server'
 
@@ -44,6 +45,19 @@ describe('movie page', () => {
     expect(fact('Productora')).toHaveTextContent('—Sin datos')
     expect(fact('Presupuesto')).toHaveTextContent('—Sin datos')
     expect(screen.queryByText(/Metascore/)).not.toBeInTheDocument()
+  })
+
+  it('shows the detail without waiting for the retries of a failed /countries', async () => {
+    server.use(http.get('/api/countries', () => problem(503, 'The database is not available.'), { once: true }))
+    // The client of the app, which retries a 5xx after a second.
+    renderApp('/movies/tt0111161', createQueryClient())
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'The Shawshank Redemption' }, { timeout: 800 }),
+    ).toBeInTheDocument()
+    // The name of the CSV first; the Spanish one when the retry succeeds.
+    expect(fact('Países')).toHaveTextContent('USA')
+    await waitFor(() => expect(fact('Países')).toHaveTextContent('Estados Unidos'), { timeout: 2000 })
   })
 
   it('says when the movie is not in the catalog', async () => {
