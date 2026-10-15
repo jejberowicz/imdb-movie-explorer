@@ -39,25 +39,34 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
 
   | Menú | Opciones | Qué pide a la API |
   |---|---|---|
-  | Año | Todas; 2020s, 2010s… hasta 1890s | `year_from` y `year_to` de la década |
+  | Año | Todas; 2020s, 2010s… hasta 1890s. Se pueden elegir varias | `decade`, una por década |
   | Rating | Más alto primero, más bajo primero | `sort=rating`, con `order` |
   | Popularidad | Más votadas, menos votadas | `sort=votes`, con `order` |
-  | Género | Todos y los 25 géneros, en español | `genre` |
+  | Género | Todos y los 25 géneros, en español. Se pueden elegir varios: quedan las películas que tienen todos | `genre`, uno por género |
   | Nombre | De la A a la Z, de la Z a la A | `sort=title`, con `order` |
   | País | Abre la página de países | — |
 
-- **El título de la sección** dice qué se está viendo: «Mejor valoradas» por defecto, o por ejemplo
-  «Mejor valoradas · Policial · 1990s». Con una búsqueda, dice «Resultados para "godf"».
+- **Lo elegido se marca con un punto** del color del logo, más discreto que una tilde. Elegir de nuevo algo
+  elegido lo saca, en cualquier menú: una década, un género o un orden, que vuelve al de por defecto. Año y
+  Género quedan abiertos después de cada clic, para elegir varios; Esc o un clic afuera los cierra.
+- **Con una sola década elegida, abajo aparece la tira de sus años**, como en Letterboxd: «2010s», 2010, 2011…
+  Solo muestra los años con películas (`GET /years`). Un año filtra solo ese año (`year_from` y `year_to`);
+  tocarlo de nuevo, o tocar la década, vuelve a la década entera.
+- **El título de la sección** dice el orden: «Mejor valoradas» por defecto. Con una búsqueda, dice
+  «Resultados para "godf"».
+- **La leyenda** cuenta en una frase lo que dejan los filtros, con los valores en negrita: «Hay 430 películas
+  del género Drama, hechas en Italia, estrenadas en los 2010s». Mientras cargan los resultados nuevos, sigue
+  describiendo los que están en pantalla. Sin filtros no aparece, y la cantidad va arriba a la derecha.
 - **«Limpiar filtros»** aparece cuando hay algo elegido y vuelve al estado inicial.
 - **Cada página muestra 24 películas**, que llenan cuatro filas de seis en un escritorio.
 
 ### Vista tabla
 
 ```text
-| TÍTULO                       | AÑO  | GÉNEROS              | DURACIÓN   | RATING | VOTOS     |
-|------------------------------|------|----------------------|------------|--------|-----------|
-| Pulp Fiction                 | 1994 | Policial, Drama      | 2 h 34 min |    8,9 | 1.780.147 |
-| Goodfellas                   | 1990 | Biografía, Policial… | 2 h 26 min |    8,7 |   991.505 |
+| TÍTULO         | AÑO  | GÉNEROS              | PAÍS            | DURACIÓN   | RATING | VOTOS     |
+|----------------|------|----------------------|-----------------|------------|--------|-----------|
+| Pulp Fiction   | 1994 | Policial, Drama      | Estados Unidos  | 2 h 34 min |    8,9 | 1.780.147 |
+| Goodfellas     | 1990 | Biografía, Policial… | Estados Unidos  | 2 h 26 min |    8,7 |   991.505 |
 ```
 
 - **Título, Año, Duración, Rating y Votos ordenan**, y llevan `aria-sort`, también para el orden por defecto. Un
@@ -140,7 +149,8 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
 - **Búsqueda en tiempo real:**
   - consulta la API 300 ms después de la última tecla;
   - un pedido nuevo cancela al anterior, y una respuesta vieja nunca reemplaza a una nueva.
-- **Estado en la URL:** `?q=&page=&year_from=&year_to=&genre=&country=&sort=&order=`. Se puede compartir,
+- **Estado en la URL:** `?q=&page=&genre=&country=&decade=&year_from=&year_to=&sort=&order=`, con `genre`,
+  `country` y `decade` repetibles. Se puede compartir,
   recargar y usar el botón atrás. Cambiar la búsqueda o un filtro vuelve a la página 1.
 - **Formato es-AR con `Intl`:**
   - votos con separador de miles (2.278.845) y abreviados en las tarjetas (2,3 M);

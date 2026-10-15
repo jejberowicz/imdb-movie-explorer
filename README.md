@@ -2,8 +2,8 @@
 
 Una API REST en Flask y una interfaz en React para explorar y buscar las 85.855 películas del CSV de IMDb.
 Se busca por título mientras se escribe, en el título original o en el italiano, sin importar mayúsculas ni
-acentos. También se puede filtrar por género, década y país (con un mapa), ordenar y ver el detalle de cada
-película. Los datos viven en PostgreSQL, y todo se levanta con un solo comando.
+acentos. También se puede filtrar por uno o varios géneros, décadas (o un año) y países (con un mapa), ordenar
+y ver el detalle de cada película. Los datos viven en PostgreSQL, y todo se levanta con un solo comando.
 
 ![La pantalla de explorar: barra «Explorar por», búsqueda y pósters generados](docs/screenshots/explorar.png)
 
@@ -142,7 +142,7 @@ responde. Nunca devuelven un stack trace.
 ## Tests
 
 ```bash
-# Backend: 191 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
+# Backend: 202 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
 cd backend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=movies \
@@ -150,7 +150,7 @@ docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=mo
 docker exec imdb-dev-db psql -U movies -c "CREATE DATABASE movies_test"
 TEST_DATABASE_URL=postgresql+psycopg://movies:movies@localhost:5433/movies_test .venv/bin/pytest
 
-# Front: 66 tests con Vitest, React Testing Library y MSW
+# Front: 76 tests con Vitest, React Testing Library y MSW
 cd frontend
 npm ci
 npm test
