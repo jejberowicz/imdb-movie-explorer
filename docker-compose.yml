@@ -47,8 +47,12 @@ services:
     environment:
       DATABASE_URL: *database-url
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      # nginx is in front and adds X-Forwarded-For: the API takes the client IP from there.
+      PROXY_HOPS: 1
+      RATE_LIMIT: ${RATE_LIMIT:-300 per minute}
+    # Published only on this machine, for Swagger, Postman and curl. The browser goes through nginx (/api).
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       seed:
         condition: service_completed_successfully
