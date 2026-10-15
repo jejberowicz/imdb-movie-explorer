@@ -21,6 +21,7 @@ from app.etl.load import load
 BACKEND = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SAMPLE_CSV = FIXTURES / "movies_sample.csv"
+EDGE_CASES_CSV = FIXTURES / "movies_edge_cases.csv"
 
 
 @pytest.fixture(scope="session")
@@ -46,9 +47,20 @@ def engine(database_url: str) -> Iterator[Engine]:
     engine.dispose()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
+def empty_db(engine: Engine) -> Engine:
+    """No movies and no load history."""
+    with engine.begin() as conn:
+        conn.execute(text("TRUNCATE movies, load_runs, load_rejections"))
+    return engine
+
+
+@pytest.fixture
 def sample_db(engine: Engine) -> Engine:
-    """The database loaded with the hand-picked sample: 16 real movies that cover the search cases."""
+    """The database with the hand-picked sample: 16 real movies that cover the search cases.
+
+    If the sample is already the last load, the load sees the same SHA-256 and does nothing.
+    """
     load(engine, SAMPLE_CSV)
     return engine
 
