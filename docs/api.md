@@ -146,7 +146,7 @@ El ejemplo está recortado: son 194 países.
 |---|---|
 | 400 | Un parámetro inválido: `page=0`, `page_size=100000`, un `sort` fuera de la lista, un id con otro formato… |
 | 404 | El id tiene un formato válido, pero no existe |
-| 429 | Demasiados pedidos (Fase 5). Incluye `Retry-After` |
+| 429 | Más de 300 pedidos por minuto desde una misma IP (configurable con `RATE_LIMIT`). Incluye `Retry-After` |
 | 500 | Un error inesperado. El detalle queda en el log, nunca en la respuesta |
 | 503 | La base no responde o todavía no hay datos cargados |
 
@@ -157,10 +157,10 @@ El ejemplo está recortado: son 194 países.
   "type": "about:blank",
   "title": "Bad Request",
   "status": 400,
-  "detail": "Invalid query parameters.",
+  "detail": "Invalid request parameters.",
   "errors": [
-    {"parameter": "page_size", "detail": "Must be between 1 and 100."},
-    {"parameter": "sort", "detail": "Must be one of: relevance, rating, year, votes, duration, title."}
+    {"parameter": "page_size", "detail": "Input should be less than or equal to 100"},
+    {"parameter": "sort", "detail": "Input should be 'relevance', 'rating', 'year', 'votes', 'duration' or 'title'"}
   ]
 }
 ```

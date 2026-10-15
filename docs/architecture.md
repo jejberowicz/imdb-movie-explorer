@@ -59,32 +59,43 @@ flowchart TB
 - **La carga (`flask seed`) vive en el mismo paquete** que la API, con sus funciones de parseo puras y
   testeadas por separado.
 
-Estructura de carpetas propuesta:
+Estructura de carpetas:
 
 ```text
 backend/
   app/
     __init__.py         create_app()
     config.py           configuración desde variables de entorno
-    api/                blueprints: movies, genres, health
-    services/
-    repositories/
+    security.py         límite de pedidos por IP y headers de seguridad
+    api/                blueprints: movies, catalog (géneros y países), health
+    services/           casos de uso: paginación, orden por defecto, catálogo por carga
+    repositories/       SQL parametrizado
     schemas/            modelos de Pydantic (parámetros y respuestas)
     errors.py           Problem Details
     countries.py        nombre del país en el CSV → código ISO donde se pinta en el mapa
     text.py             plegado del texto, el mismo para la carga y para la búsqueda
     etl/                parseo, reglas del ADR 0003 y comando seed
   migrations/           Alembic
-  tests/                unit/, integration/ y fixtures/ (CSV chico con los casos borde)
-  pyproject.toml
+  scripts/              EXPLAIN de las consultas y medición de p50 y p95
+  tests/                parseo, carga, API, seguridad, criterios de aceptación y fixtures/ (CSV chicos)
   Dockerfile
 frontend/
-  src/                  api/, components/, features/movies/, routes/, styles/
-  nginx.conf
+  src/
+    api/                cliente HTTP y tipos de la API
+    components/         barra «Explorar por», menús, grilla, tabla, póster, estados, marco de la página
+    features/countries/ el mapa: formas de Natural Earth, proyección y componente
+    hooks/              catálogo, vista elegida, media queries, título de la pestaña
+    lib/                estado en la URL, formatos es-AR, géneros, países, pósters
+    pages/              explorar, detalle, por país, 404 y error
+    styles/             paleta y estilos globales
+    test/               MSW con los datos de prueba y helpers
+  nginx/                configuración y headers de seguridad
   Dockerfile
+db/init/                crea el usuario de solo lectura de la API
+scripts/                perfilado del CSV, benchmark de almacenamiento y armado del mapa
 data/IMDb_movies.csv.gz
 docker-compose.yml
-.env.example
+.github/workflows/      CI
 ```
 
 ## Frontend
@@ -106,6 +117,10 @@ React con TypeScript y Vite.
   ([ADR 0010](decisions/0010-generated-posters.md)).
 - **El mapa usa d3-geo** para proyectar la geometría de Natural Earth. Se carga solo al abrir esa página, para
   no sumar peso a la principal.
+- **React Router en modo datos** (`createBrowserRouter`): da la restauración del scroll al volver de un
+  detalle, la carga diferida de la página por país y una página de error si algo falla al mostrar una ruta.
+- **Al cambiar de página, el foco pasa al contenido**, para que un lector de pantalla empiece a leer ahí. Al
+  escribir en la búsqueda no se mueve, porque solo cambia la query string.
 
 ## Modelo de datos
 
@@ -144,8 +159,8 @@ fuente.
 | GIN en `genres` | El filtro por género (`genres @> ARRAY['Drama']`) |
 | GIN en `countries` | El filtro por país, que acepta varios a la vez (`countries && ARRAY['Russia', 'Soviet Union']`) |
 
-Los índices para los otros órdenes (año, votos, duración, título) se agregan en la Fase 2 solo si
-`EXPLAIN ANALYZE` muestra que hacen falta. Con 85.855 filas, ordenar en memoria puede alcanzar.
+Los otros órdenes (año, votos, duración, título) no tienen índice: con 85.855 filas, ordenar en memoria tarda
+unos milisegundos, y `EXPLAIN ANALYZE` no mostró que hiciera falta ([performance.md](performance.md)).
 
 ### Qué se normaliza y qué no
 
@@ -182,6 +197,7 @@ Los índices para los otros órdenes (año, votos, duración, título) se agrega
 ### Usuarios de la base
 
 - **El dueño** (migraciones y seed) crea tablas y escribe.
-- **El de la API** solo puede leer (`SELECT`) y tiene `statement_timeout`, para cortar cualquier consulta
-  inesperadamente cara.
+- **El de la API, `movies_api`,** solo puede leer (`SELECT`), todas sus transacciones son de solo lectura y
+  tiene un `statement_timeout` de 5 s, para cortar cualquier consulta inesperadamente cara. Lo crea
+  `db/init/01-api-reader.sh` cuando se crea la base.
 - Las credenciales llegan por variables de entorno. En el repo solo está `.env.example`, sin valores reales.

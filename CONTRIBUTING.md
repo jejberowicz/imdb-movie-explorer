@@ -56,3 +56,20 @@ npm run build
 - **El CSV** está en `data/IMDb_movies.csv.gz`. Descomprimido, su SHA-256 es
   `66032d99cae8414dd8695bc5265a46cfa18e1ff092d130f243d93179dee07db4`.
 - **El perfil del dataset** se regenera con `python3 scripts/profile_dataset.py`, y tiene que quedar idéntico.
+
+## Scripts
+
+| Script | Para qué |
+|---|---|
+| `scripts/profile_dataset.py` | Regenera `docs/data-profile.md` desde el CSV |
+| `scripts/benchmark_storage.py` | La comparación de pandas, SQLite y PostgreSQL del ADR 0005 (`scripts/requirements-benchmark.txt`) |
+| `scripts/build_world_map.py` | Regenera las formas del mapa desde Natural Earth 5.1.2 |
+| `backend/scripts/explain_queries.py` | `EXPLAIN ANALYZE` de las consultas principales (`DATABASE_URL`) |
+| `backend/scripts/measure_latency.py` | p50 y p95 de los endpoints contra una API corriendo, con el límite de pedidos subido |
+
+## Docker y CI
+
+- **`docker compose up --build`** levanta todo; `docker compose down -v` borra también la base. La API usa el
+  usuario de solo lectura que crea `db/init/01-api-reader.sh` la primera vez que se crea la base.
+- **El CI** (`.github/workflows/ci.yml`) corre ruff, pytest con PostgreSQL, pip-audit, oxlint, tsc, Vitest,
+  npm audit y un `docker compose up` con un smoke test. Las actions están fijadas a un commit.
