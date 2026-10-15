@@ -4,3 +4,6 @@
 .ruff_cache
 .coverage
 htmlcov
+# Never bake a local environment file into the image
+.env
+.env.*
