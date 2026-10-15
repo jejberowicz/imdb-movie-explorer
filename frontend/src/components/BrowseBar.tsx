@@ -80,6 +80,7 @@ export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
         <Dropdown
           label="País"
           options={countryOptions}
+          actions
           active={state.countries.length > 0}
           onSelect={(choice) =>
             choice === 'map'

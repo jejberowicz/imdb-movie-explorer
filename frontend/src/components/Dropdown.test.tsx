@@ -51,6 +51,52 @@ describe('dropdown menu', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('offers commands as plain menu items, with none checked', async () => {
+    const onSelect = vi.fn()
+    render(
+      <Dropdown
+        label="País"
+        actions
+        options={[
+          { label: 'Ver el mapa de países', value: 'map' },
+          { label: 'Quitar el país elegido', value: 'clear' },
+        ]}
+        onSelect={onSelect}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'País' }))
+
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Ver el mapa de países' })).toHaveFocus()
+    expect(screen.getByRole('menuitem', { name: 'Ver el mapa de países' })).not.toHaveAttribute('aria-checked')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(onSelect).toHaveBeenCalledWith('clear')
+  })
+
+  it('tells apart two options with the same label', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const onSelect = vi.fn()
+    render(
+      <Dropdown
+        label="Género"
+        options={[
+          { label: 'Drama', value: 'Drama' },
+          { label: 'Drama', value: 'drama' },
+        ]}
+        onSelect={onSelect}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Género' }))
+    await user.click(screen.getAllByRole('menuitemradio', { name: 'Drama' })[1])
+
+    expect(onSelect).toHaveBeenCalledWith('drama')
+    // React warns about two children with the same key.
+    expect(errors).not.toHaveBeenCalled()
+    errors.mockRestore()
+  })
+
   it('closes with Esc or a click outside, without choosing', async () => {
     const { onSelect, user, trigger } = renderDropdown(null)
     await user.click(trigger)
