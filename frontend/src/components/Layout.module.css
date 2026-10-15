@@ -1,0 +1,24 @@
+.main {
+  min-height: calc(100vh - 64px - 96px);
+  padding-top: 20px;
+}
+
+.main:focus {
+  outline: none;
+}
+
+.footer {
+  margin-top: 24px;
+  padding: 18px 0 28px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.footer p {
+  margin: 0 0 4px;
+}
+
+.footer a {
+  color: var(--muted);
+}
