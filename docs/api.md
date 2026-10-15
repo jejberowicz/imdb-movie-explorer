@@ -27,6 +27,7 @@ Devuelve una página de películas. Con `title`, filtra por título.
 | `genre` | texto, repetible | — | Un género de `GET /genres`, en inglés, como en los datos; hasta 40 caracteres y 10 valores. Con varios, devuelve las películas que tienen todos (`Comedy` y `Romance` son las comedias románticas). Uno que no existe devuelve una lista vacía |
 | `country` | texto, repetible | — | Un país de `GET /countries`, como en los datos; hasta 20 valores. Con varios, devuelve las películas de cualquiera de ellos |
 | `decade` | entero, repetible | — | El primer año de una década (1990 para los 1990s), entre 1880 y 2100; hasta 23 valores. Con varias, devuelve las películas de cualquiera de ellas. Se combina con `year_from` y `year_to` |
+| `year` | entero, repetible | — | Entre 1880 y 2100; hasta 50 valores. Con varios, devuelve las películas de cualquiera de ellos. Se combina con `decade`: la interfaz lo usa para los años elegidos de una década |
 | `year_from`, `year_to` | entero | — | Entre 1880 y 2100, con `year_from` menor o igual que `year_to` |
 | `min_votes` | entero | — | 0 o más |
 
@@ -196,6 +197,7 @@ curl "http://localhost:8000/movies?title=relatos%20salvajes"
 curl "http://localhost:8000/movies?genre=Drama&year_from=1990&year_to=1999&sort=votes"
 curl "http://localhost:8000/movies/tt0068646"
 curl "http://localhost:8000/movies?genre=Comedy&genre=Romance&decade=1990&decade=2010"
+curl "http://localhost:8000/movies?decade=1990&year=1994&year=1997"
 curl "http://localhost:8000/genres"
 curl "http://localhost:8000/movies?country=Russia&country=Soviet%20Union"
 ```

@@ -50,8 +50,9 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
   elegido lo saca, en cualquier menú: una década, un género o un orden, que vuelve al de por defecto. Año y
   Género quedan abiertos después de cada clic, para elegir varios; Esc o un clic afuera los cierra.
 - **Con una sola década elegida, abajo aparece la tira de sus años**, como en Letterboxd: «2010s», 2010, 2011…
-  Solo muestra los años con películas (`GET /years`). Un año filtra solo ese año (`year_from` y `year_to`);
-  tocarlo de nuevo, o tocar la década, vuelve a la década entera.
+  Solo muestra los años con películas (`GET /years`). Se pueden elegir varios años, que se suman (`year`
+  repetido): 1994 y 1997 muestran las películas de cualquiera de los dos. Tocar uno elegido lo saca, y tocar la
+  década vuelve a la década entera. Cambiar de década borra los años elegidos.
 - **El título de la sección** dice el orden: «Mejor valoradas» por defecto. Con una búsqueda, dice
   «Resultados para "godf"».
 - **La leyenda** cuenta en una frase lo que dejan los filtros, con los valores en negrita: «Hay 430 películas
@@ -149,8 +150,8 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
 - **Búsqueda en tiempo real:**
   - consulta la API 300 ms después de la última tecla;
   - un pedido nuevo cancela al anterior, y una respuesta vieja nunca reemplaza a una nueva.
-- **Estado en la URL:** `?q=&page=&genre=&country=&decade=&year_from=&year_to=&sort=&order=`, con `genre`,
-  `country` y `decade` repetibles. Se puede compartir,
+- **Estado en la URL:** `?q=&page=&genre=&country=&decade=&year=&year_from=&year_to=&sort=&order=`, con
+  `genre`, `country`, `decade` y `year` repetibles. Se puede compartir,
   recargar y usar el botón atrás. Cambiar la búsqueda o un filtro vuelve a la página 1.
 - **Formato es-AR con `Intl`:**
   - votos con separador de miles (2.278.845) y abreviados en las tarjetas (2,3 M);

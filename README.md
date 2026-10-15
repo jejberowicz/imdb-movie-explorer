@@ -98,7 +98,7 @@ Así la API usa el usuario dueño. Los usuarios separados (dueño sin superusuar
 
 | Endpoint | Qué devuelve |
 |---|---|
-| `GET /movies` | Una página de películas. Filtra con `title`, `genre`, `country` y `decade` (repetibles), `year_from`, `year_to` y `min_votes`; ordena con `sort` (`relevance`, `rating`, `year`, `votes`, `duration`, `title`) y `order` (`asc`, `desc`); pagina con `page` y `page_size` (hasta 100) |
+| `GET /movies` | Una página de películas. Filtra con `title`, `genre`, `country`, `decade` y `year` (repetibles), `year_from`, `year_to` y `min_votes`; ordena con `sort` (`relevance`, `rating`, `year`, `votes`, `duration`, `title`) y `order` (`asc`, `desc`); pagina con `page` y `page_size` (hasta 100) |
 | `GET /movies/{imdb_title_id}` | El detalle completo de una película |
 | `GET /genres` | Los 25 géneros, con su cantidad de películas |
 | `GET /countries` | Los 194 países del CSV, con su cantidad de películas y el código ISO donde los pinta el mapa |
@@ -142,7 +142,7 @@ responde. Nunca devuelven un stack trace.
 ## Tests
 
 ```bash
-# Backend: 202 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
+# Backend: 205 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
 cd backend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=movies \
@@ -150,7 +150,7 @@ docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=mo
 docker exec imdb-dev-db psql -U movies -c "CREATE DATABASE movies_test"
 TEST_DATABASE_URL=postgresql+psycopg://movies:movies@localhost:5433/movies_test .venv/bin/pytest
 
-# Front: 76 tests con Vitest, React Testing Library y MSW
+# Front: 75 tests con Vitest, React Testing Library y MSW
 cd frontend
 npm ci
 npm test
