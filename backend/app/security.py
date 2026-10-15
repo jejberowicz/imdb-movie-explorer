@@ -29,7 +29,8 @@ def init_security(app: Flask, settings: Settings) -> None:
     limiter = Limiter(
         get_remote_address,
         app=app,
-        default_limits=[settings.rate_limit],
+        # One count per client for the whole API. default_limits would keep one per route: 300 a minute to each.
+        application_limits=[settings.rate_limit],
         storage_uri="memory://",
         headers_enabled=True,
         # Flask-Limiter exempts a request without an endpoint, so 404s and 405s had no limit at all. They share

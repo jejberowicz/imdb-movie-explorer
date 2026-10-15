@@ -68,8 +68,8 @@ def test_requests_that_match_no_route_are_limited_too(sample_db: Engine, databas
         client.get("/other", environ_base=outside).status_code,
     ]
     assert statuses == [404, 405, 429]
-    # The routes have their own count.
-    assert client.get("/genres", environ_base=outside).status_code == 200
+    # The same count as the routes: the 404s already used it up.
+    assert client.get("/genres", environ_base=outside).status_code == 429
 
 
 def test_the_docker_health_check_is_never_limited(sample_db: Engine, database_url: str) -> None:
@@ -95,3 +95,10 @@ def test_the_client_ip_comes_from_the_proxy_only_when_there_is_one(
     second = client.get("/genres", headers={"X-Forwarded-For": "203.0.113.2"})
     assert first.status_code == 200
     assert (second.status_code == 200) is separate
+
+
+def test_the_limit_counts_every_route_together(sample_db: Engine, database_url: str) -> None:
+    """300 a minute per client in total, not 300 to each route."""
+    client = make_client(database_url, rate_limit="3 per minute")
+    statuses = [client.get(path).status_code for path in ("/genres", "/countries", "/movies", "/movies/tt0111161")]
+    assert statuses == [200, 200, 200, 429]
