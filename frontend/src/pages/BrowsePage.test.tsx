@@ -161,6 +161,21 @@ describe('browse page', () => {
     await waitFor(() => expect(searchOf(router)).toEqual({ q: ['the god'] }))
   })
 
+  it('undoes a typed search with the back button, back to the list from before', async () => {
+    const { router, user } = renderApp('/?genre=Drama')
+    await screen.findByRole('link', { name: 'Stalker (1979)' })
+
+    await user.type(searchBox(), 'stal')
+    await waitFor(() => expect(searchOf(router)).toEqual({ q: ['stal'], genre: ['Drama'] }))
+    await user.type(searchBox(), 'ker')
+    await waitFor(() => expect(searchOf(router)).toEqual({ q: ['stalker'], genre: ['Drama'] }))
+
+    // One entry for the whole search, not one per pause.
+    await act(() => router.navigate(-1))
+    expect(router.state.location.search).toBe('?genre=Drama')
+    await waitFor(() => expect(searchBox()).toHaveValue(''))
+  })
+
   it('changes the URL once per search: Enter and the back button don\'t make it bounce', async () => {
     const { router, user } = renderApp()
     await screen.findByRole('link', { name: 'Stalker (1979)' })

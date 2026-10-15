@@ -88,14 +88,20 @@ export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
           }
         />
       </div>
-      <SearchBox value={state.q} onSearch={(q, replace) => onChange({ q, page: 1 }, replace)} />
+      <SearchBox
+        value={state.q}
+        // While typing, the first search adds an entry to the history, so the back button returns to the list
+        // from before; the next ones replace it, so the history doesn't fill up with every pause.
+        onSearch={(q, typing) => onChange({ q, page: 1 }, typing && state.q.trim() !== '')}
+      />
     </div>
   )
 }
 
 interface SearchBoxProps {
   value: string
-  onSearch: (q: string, replace: boolean) => void
+  /** `typing` is true when the search comes from a pause while typing, false for Enter. */
+  onSearch: (q: string, typing: boolean) => void
 }
 
 /** Searches 300 ms after the last key; Enter searches right away and Esc clears. */
