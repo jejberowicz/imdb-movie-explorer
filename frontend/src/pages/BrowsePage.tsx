@@ -118,6 +118,7 @@ export default function BrowsePage() {
                 movies={data.items}
                 sort={state.sort}
                 order={state.order}
+                searching={Boolean(state.q.trim())}
                 onSort={(sort, order) => change({ sort, order, page: 1 })}
               />
             )}

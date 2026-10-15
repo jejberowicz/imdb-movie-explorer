@@ -265,6 +265,20 @@ describe('table view', () => {
     expect(screen.getByRole('columnheader', { name: 'Duración' })).toHaveAttribute('aria-sort', 'ascending')
   })
 
+  it('says that the order by rating weighs the votes, since the column shows the plain average', async () => {
+    localStorage.setItem('fakeimdb:view', 'table')
+    const { user } = renderApp()
+    const table = await screen.findByRole('table')
+    const note = /El orden por rating tiene en cuenta la cantidad de votos/
+
+    // The default order is the weighted rating too (ADR 0008).
+    expect(table).toHaveAccessibleDescription(note)
+    await user.click(within(table).getByRole('button', { name: 'Votos' }))
+    await waitFor(() => expect(screen.queryByText(note)).not.toBeInTheDocument())
+    await user.click(within(screen.getByRole('table')).getByRole('button', { name: 'Rating' }))
+    expect(await screen.findByText(note)).toBeInTheDocument()
+  })
+
   it('always shows the posters on a phone', async () => {
     localStorage.setItem('fakeimdb:view', 'table')
     window.matchMedia = (query: string) =>
