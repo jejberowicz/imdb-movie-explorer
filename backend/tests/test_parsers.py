@@ -9,7 +9,10 @@ from app.etl.parsers import (
     parse_id,
     parse_list,
     parse_money,
+    parse_optional_text,
     parse_rating,
+    parse_required_text,
+    parse_score,
     parse_whole,
     parse_year,
     repair_mojibake,
@@ -62,6 +65,20 @@ class TestRequiredNumbers:
     def test_malformed_count(self, text: str) -> None:
         with pytest.raises(InvalidValue, match="malformed votes"):
             parse_count(text, "votes")
+
+    def test_count_out_of_the_column_range(self) -> None:
+        with pytest.raises(InvalidValue, match="duration out of range"):
+            parse_count("0", "duration", minimum=1)
+        with pytest.raises(InvalidValue, match="duration out of range"):
+            parse_count("40000", "duration", maximum=32767)
+
+    @pytest.mark.parametrize(("text", "expected"), [("80.0", (80, "whole_from_decimal")), ("0", (0, None))])
+    def test_score(self, text: str, expected: tuple[int, str | None]) -> None:
+        assert parse_score(text) == expected
+
+    def test_score_over_100(self) -> None:
+        with pytest.raises(InvalidValue, match="metascore out of range"):
+            parse_score("101")
 
     @pytest.mark.parametrize(("text", "expected"), [("9.3", 9.3), ("1.0", 1.0), ("10", 10.0)])
     def test_rating(self, text: str, expected: float) -> None:
@@ -139,6 +156,23 @@ class TestMojibake:
     def test_healthy_text_is_not_touched(self) -> None:
         for text in ("Amélie", "São Paulo", "Ãlvaro is a name", "plain text"):
             assert repair_mojibake(text) == (text, None)
+
+
+class TestText:
+    def test_required_text_is_trimmed(self) -> None:
+        assert parse_required_text("  Up ", "title") == "Up"
+
+    def test_empty_required_text_is_invalid(self) -> None:
+        with pytest.raises(InvalidValue, match="empty title"):
+            parse_required_text("   ", "title")
+
+    def test_nul_characters_are_removed(self) -> None:
+        # PostgreSQL can't store them; one would make the whole COPY fail.
+        assert parse_optional_text("Before\x00after") == "Beforeafter"
+        assert parse_list("English,\x00None")[0] == ["English", "None"]
+
+    def test_empty_optional_text_is_no_data(self) -> None:
+        assert parse_optional_text("  ") is None
 
 
 class TestIds:

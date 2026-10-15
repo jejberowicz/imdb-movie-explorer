@@ -118,7 +118,7 @@ React con TypeScript y Vite.
 | `italian_title` | `text` | `NOT NULL`. Es la columna `title` del CSV |
 | `original_title_search`, `italian_title_search` | `text` | `NOT NULL`. Los títulos plegados: minúsculas, sin acentos y con ø, æ, ð y þ convertidas |
 | `year` | `smallint` | `NOT NULL`, `CHECK` entre 1880 y 2100. El límite del año actual lo aplica la carga (regla 1): un `CHECK` no puede depender de la fecha |
-| `genres` | `text[]` | `NOT NULL`; entre 1 y 3 |
+| `genres` | `text[]` | `NOT NULL`, al menos uno. El CSV trae hasta 3, pero un `CHECK` con máximo rechazaría una película válida si un CSV futuro trajera más |
 | `duration` | `smallint` | `NOT NULL`, minutos, `CHECK > 0` |
 | `countries`, `languages`, `directors`, `writers`, `actors` | `text[]` | Listas, sin repetidos; `NULL` si el CSV no trae el dato. En `languages`, «None» significa sin diálogos |
 | `production_company`, `description` | `text` | `NULL` si el CSV no trae el dato |

@@ -21,6 +21,8 @@ _RATING = re.compile(r"[0-9]{1,2}(\.[0-9])?")
 _MONEY = re.compile(r"(\$|[A-Z]{3}) ([0-9]+)")
 _MOJIBAKE = re.compile(r"Ã[\x80-\xbf]|Â[\x80-\xbf]|â€")
 _BIGINT_MAX = 2**63 - 1
+INT_MAX = 2**31 - 1
+SMALLINT_MAX = 2**15 - 1
 
 
 class InvalidValue(ValueError):
@@ -38,15 +40,20 @@ def parse_id(text: str) -> str:
     return text
 
 
+def _clean(text: str) -> str:
+    # PostgreSQL can't store the NUL character in a text column: one would make the whole COPY fail.
+    return text.replace("\x00", "").strip()
+
+
 def parse_required_text(text: str, column: str) -> str:
-    value = text.strip()
+    value = _clean(text)
     if not value:
         raise InvalidValue(f"empty {column}")
     return value
 
 
 def parse_optional_text(text: str) -> str | None:
-    return text.strip() or None
+    return _clean(text) or None
 
 
 def parse_year(text: str, max_year: int) -> tuple[int, str | None]:
@@ -63,11 +70,14 @@ def parse_year(text: str, max_year: int) -> tuple[int, str | None]:
     return year, (None if value == str(year) else "year_from_text")
 
 
-def parse_count(text: str, column: str) -> int:
-    """A required non-negative integer: votes, duration."""
+def parse_count(text: str, column: str, minimum: int = 0, maximum: int = INT_MAX) -> int:
+    """A required integer within the range of its column: votes, duration."""
     if not _COUNT.fullmatch(text.strip()):
         raise InvalidValue(f"malformed {column}")
-    return int(text)
+    value = int(text)
+    if not minimum <= value <= maximum:
+        raise InvalidValue(f"{column} out of range")
+    return value
 
 
 def parse_whole(text: str) -> tuple[int | None, str | None]:
@@ -78,7 +88,17 @@ def parse_whole(text: str) -> tuple[int | None, str | None]:
     match = _WHOLE.fullmatch(value)
     if not match:
         raise InvalidValue("not a whole number")
+    if int(match.group(1)) > INT_MAX:
+        raise InvalidValue("number out of range")
     return int(match.group(1)), ("whole_from_decimal" if match.group(2) else None)
+
+
+def parse_score(text: str) -> tuple[int | None, str | None]:
+    """Metascore: a whole number from 0 to 100, possibly written as a decimal."""
+    value, correction = parse_whole(text)
+    if value is not None and value > 100:
+        raise InvalidValue("metascore out of range")
+    return value, correction
 
 
 def parse_rating(text: str) -> float:
@@ -109,7 +129,7 @@ def parse_list(text: str) -> tuple[list[str] | None, list[str]]:
     """Rules 5 and 6: split by comma keeping names like "Norse, Old" whole, and drop repeated items."""
     items: list[str] = []
     corrections: list[str] = []
-    for part in (part.strip() for part in text.split(",")):
+    for part in (_clean(part) for part in text.split(",")):
         if not part:
             continue
         if items and f"{items[-1]}, {part}" in COMMA_NAMES:

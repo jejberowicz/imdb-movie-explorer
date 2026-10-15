@@ -10,6 +10,10 @@ general de la carga es que una fila que no se puede interpretar no frena el proc
 motivo, se cuenta y al final hay un resumen; si los rechazos superan un umbral, la carga falla. Este ADR
 fija qué se corrige, qué se rechaza y qué se deja como está.
 
+Una fila se rechaza solo si falla un campo obligatorio: el id, los títulos, el año, el género, la duración,
+el rating o los votos. Si falla un campo opcional, como el metascore o un monto, ese valor se descarta con un
+aviso y la película se carga igual: no se pierde una película por un dato secundario.
+
 ## Opciones descartadas
 
 - **Rechazar cualquier fila con un valor inesperado.** Se perdería *Bad Education* (2019) por un texto que
