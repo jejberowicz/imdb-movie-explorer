@@ -115,6 +115,7 @@ Valores separados por coma.
 
 - Ejemplo de ítem repetido: `tt0021725`, `director` = "William A. Seiter, William A. Seiter".
 - Nombres que contienen una coma: "Greek, Ancient (to 1453)" ×10 en `language`, "Norse, Old" ×4 en `language`. Partir solo por la coma inventaría valores falsos, como «Old».
+- Países que ya no existen, disueltos o con otro nombre, y que un mapa actual no tiene: West Germany ×1.114, Soviet Union ×866, Yugoslavia ×395, Czechoslovakia ×313, East Germany ×74, Federal Republic of Yugoslavia ×73, Serbia and Montenegro ×7, Netherlands Antilles ×5, Zaire ×2, Burma ×1, Korea ×1.
 - Los 25 géneros: Drama (47.110), Comedy (29.368), Romance (14.128), Action (12.948), Thriller (11.388), Crime (11.067), Horror (9.557), Adventure (7.590), Mystery (5.225), Family (3.962), Fantasy (3.812), Sci-Fi (3.608), Biography (2.377), History (2.296), War (2.242), Animation (2.141), Musical (2.041), Music (1.689), Western (1.583), Sport (1.064), Film-Noir (663), Reality-TV (3), Adult (2), Documentary (2), News (1).
 
 ## Montos

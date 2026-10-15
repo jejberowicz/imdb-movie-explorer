@@ -40,6 +40,11 @@ FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 PRE_EURO_CURRENCIES = {"ATS", "BEF", "DEM", "ESP", "FIM", "FRF", "GRD", "IEP", "ITL", "LUF", "NLG", "PTE"}
 # Names that contain the list separator (ISO 639 style), found while reviewing rows with repeated items.
 COMMA_NAMES = {"Greek, Ancient (to 1453)", "Norse, Old"}
+# Country names that no longer exist (dissolved or renamed), reviewed by hand among the 194 in the CSV.
+FORMER_COUNTRIES = {
+    "Burma", "Czechoslovakia", "East Germany", "Federal Republic of Yugoslavia", "Korea", "Netherlands Antilles",
+    "Serbia and Montenegro", "Soviet Union", "West Germany", "Yugoslavia", "Zaire",
+}
 SEARCH_PROBES = ["shawshank", "godfather", "relatos salvajes", "amelie"]
 TITLE_EXAMPLES = {"tt0068646", "tt0111161", "tt3011894"}
 # UTF-8 text that was decoded as Latin-1 or Windows-1252: "é" shows up as "Ã©".
@@ -523,6 +528,15 @@ def section_multi_value(rows: list[Row]) -> list[str]:
             "- Nombres que contienen una coma: "
             + ", ".join(f"{quote(name)} ×{fmt(counts[col][name])} en `{col}`" for name, col in comma_names)
             + ". Partir solo por la coma inventaría valores falsos, como «Old»."
+        )
+    former = sorted(
+        ((name, n) for name in FORMER_COUNTRIES if (n := counts["country"][name])), key=lambda item: (-item[1], item[0])
+    )
+    if former:
+        lines.append(
+            "- Países que ya no existen, disueltos o con otro nombre, y que un mapa actual no tiene: "
+            + ", ".join(f"{name} ×{fmt(n)}" for name, n in former)
+            + "."
         )
     genres = ", ".join(f"{name} ({fmt(n)})" for name, n in counts["genre"].most_common())
     return lines + [
