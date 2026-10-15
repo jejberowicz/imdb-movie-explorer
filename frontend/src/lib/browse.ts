@@ -1,11 +1,13 @@
 /**
- * The browse state lives in the URL (?q=&page=&genre=&country=&year_from=&year_to=&sort=&order=), so a search
- * can be shared, reloaded and undone with the back button.
+ * The browse state lives in the URL (?q=&page=&genre=&country=&decade=&year_from=&year_to=&sort=&order=), so a
+ * search can be shared, reloaded and undone with the back button. Genre, country and decade can repeat.
  */
 
 import type { MovieQuery, SortField, SortOrder } from '../api/movies'
+import { countMovies } from './format'
 
 export const PAGE_SIZE = 24
+/** The decades of the Año menu until GET /years answers. */
 export const DECADES = Array.from({ length: 14 }, (_, index) => 2020 - index * 10)
 
 const SORTS: SortField[] = ['relevance', 'rating', 'year', 'votes', 'duration', 'title']
@@ -13,8 +15,12 @@ const SORTS: SortField[] = ['relevance', 'rating', 'year', 'votes', 'duration', 
 export interface BrowseState {
   q: string
   page: number
-  genre?: string
+  /** Movies with all of them. */
+  genres: string[]
+  /** Movies of any of them. */
   countries: string[]
+  /** Movies of any of them: the first year of each decade, newest first. */
+  decades: number[]
   yearFrom?: number
   yearTo?: number
   sort?: SortField
@@ -28,6 +34,7 @@ const FIRST_YEAR = 1880
 const LAST_YEAR = 2100
 const MAX_QUERY = 200
 const MAX_GENRE = 40
+const MAX_GENRES = 10
 const MAX_COUNTRY = 60
 const MAX_COUNTRIES = 20
 
@@ -48,18 +55,23 @@ const text = (value: string) => value.replace(/\p{Cc}/gu, '')
 /** Length as the API counts it: characters, not UTF-16 units. */
 const length = (value: string) => Array.from(value).length
 
+/** Each value once, in the order it came, up to `max`. */
+function list(values: string[], maxLength: number, max: number): string[] {
+  const kept = values.map((value) => text(value).trim()).filter((value) => value && length(value) <= maxLength)
+  return [...new Set(kept)].slice(0, max)
+}
+
 export function readBrowseState(params: URLSearchParams): BrowseState {
   const sort = params.get('sort') as SortField | null
   const order = params.get('order')
   const q = Array.from(text(params.get('q') ?? ''))
     .slice(0, MAX_QUERY)
     .join('')
-  const genre = text(params.get('genre') ?? '')
-  const countries = params
-    .getAll('country')
-    .map((country) => text(country).trim())
-    .filter((country) => country && length(country) <= MAX_COUNTRY)
-    .slice(0, MAX_COUNTRIES)
+  const decades = params
+    .getAll('decade')
+    .map(integer)
+    .filter((decade): decade is number => decade !== undefined && decade % 10 === 0)
+    .filter((decade) => decade >= FIRST_YEAR && decade <= LAST_YEAR)
   let yearFrom = year(params.get('year_from'))
   let yearTo = year(params.get('year_to'))
   // A reversed range is still a range: 1999 to 1990 means the 1990s.
@@ -67,8 +79,9 @@ export function readBrowseState(params: URLSearchParams): BrowseState {
   return {
     q,
     page: clamp(integer(params.get('page')) ?? 1, 1, MAX_PAGE),
-    genre: genre && length(genre) <= MAX_GENRE ? genre : undefined,
-    countries,
+    genres: list(params.getAll('genre'), MAX_GENRE, MAX_GENRES),
+    countries: list(params.getAll('country'), MAX_COUNTRY, MAX_COUNTRIES),
+    decades: [...new Set(decades)].sort((a, b) => b - a),
     yearFrom,
     yearTo,
     // Relevance only means something with a search: without one, the default order (the rating).
@@ -80,8 +93,9 @@ export function readBrowseState(params: URLSearchParams): BrowseState {
 export function writeBrowseState(state: BrowseState): URLSearchParams {
   const params = new URLSearchParams()
   if (state.q.trim()) params.set('q', state.q.trim())
-  if (state.genre) params.set('genre', state.genre)
+  for (const genre of state.genres) params.append('genre', genre)
   for (const country of state.countries) params.append('country', country)
+  for (const decade of state.decades) params.append('decade', String(decade))
   if (state.yearFrom !== undefined) params.set('year_from', String(state.yearFrom))
   if (state.yearTo !== undefined) params.set('year_to', String(state.yearTo))
   // Clearing the search leaves sort=relevance behind: the API rejects it without a title.
@@ -105,28 +119,46 @@ export function toMovieQuery(state: BrowseState): MovieQuery {
     pageSize: PAGE_SIZE,
     sort: state.sort,
     order: state.order,
-    genre: state.genre,
+    genres: state.genres.length ? state.genres : undefined,
     countries: state.countries.length ? state.countries : undefined,
+    decades: state.decades.length ? state.decades : undefined,
     yearFrom: state.yearFrom,
     yearTo: state.yearTo,
   }
 }
 
-/** The decade chosen in the Año menu, if the year range is exactly one. */
-export function decadeOf(state: BrowseState): number | undefined {
-  const { yearFrom, yearTo } = state
-  return yearFrom !== undefined && yearFrom % 10 === 0 && yearTo === yearFrom + 9 ? yearFrom : undefined
+/** A list in words: "A", "A y B", "A, B y C". */
+export function inWords(items: string[], last = 'y'): string {
+  return items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${last} ${items.at(-1)}`
 }
 
+/** Adds the value if it isn't there and takes it out if it is: the menus that allow several. */
+export function toggle<T>(values: T[], value: T): T[] {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
+}
+
+/** The single year chosen inside the only chosen decade, if any: the strip of years marks it. */
+export function chosenYear(state: BrowseState): number | undefined {
+  const { decades, yearFrom, yearTo } = state
+  if (decades.length !== 1 || yearFrom === undefined || yearFrom !== yearTo) return undefined
+  return yearFrom >= decades[0] && yearFrom <= decades[0] + 9 ? yearFrom : undefined
+}
+
+/** A filter is chosen: genre, country, year or a search. The order alone isn't one. */
 export function hasFilters(state: BrowseState): boolean {
   return Boolean(
     state.q.trim() ||
-      state.genre ||
+      state.genres.length ||
       state.countries.length ||
+      state.decades.length ||
       state.yearFrom !== undefined ||
-      state.yearTo !== undefined ||
-      state.sort,
+      state.yearTo !== undefined,
   )
+}
+
+/** Something differs from the start page, so there is something to clear. */
+export function hasChoices(state: BrowseState): boolean {
+  return hasFilters(state) || Boolean(state.sort)
 }
 
 const ORDER_TITLES: Record<string, string> = {
@@ -142,8 +174,8 @@ const ORDER_TITLES: Record<string, string> = {
   'duration-asc': 'Más cortas',
 }
 
-/** The title of the results: what is being shown, in words. */
-export function sectionTitle(state: BrowseState, labels: { genre?: string; countries?: string }): string {
+/** The title of the results: the search and the order. The filters are told by the legend below. */
+export function sectionTitle(state: BrowseState): string {
   const parts: string[] = []
   const query = state.q.trim()
   if (query) parts.push(`Resultados para «${query}»`)
@@ -153,11 +185,57 @@ export function sectionTitle(state: BrowseState, labels: { genre?: string; count
     const order = state.order ?? (sort === 'title' ? 'asc' : 'desc')
     parts.push(ORDER_TITLES[`${sort}-${order}`])
   }
-  if (labels.genre) parts.push(labels.genre)
-  const decade = decadeOf(state)
-  if (decade !== undefined) parts.push(`${decade}s`)
-  else if (state.yearFrom !== undefined || state.yearTo !== undefined)
-    parts.push(`${state.yearFrom ?? '…'}–${state.yearTo ?? '…'}`)
-  if (labels.countries) parts.push(labels.countries)
   return parts.join(' · ')
+}
+
+export interface FilterLabels {
+  /** The chosen genres and countries, in Spanish. */
+  genres: string[]
+  countries: string[]
+}
+
+/** When the movies were released, as [words, values]: ["en los ", "1990s y 2000s"], ["entre ", "1950 y 1960"]. */
+function released(state: BrowseState): [string, string][] {
+  const year = chosenYear(state)
+  if (year !== undefined) return [['en ', String(year)]]
+  const phrases: [string, string][] = []
+  if (state.decades.length) phrases.push(['en los ', inWords([...state.decades].reverse().map((decade) => `${decade}s`))])
+  const { yearFrom, yearTo } = state
+  if (yearFrom !== undefined && yearFrom === yearTo) phrases.push(['en ', String(yearFrom)])
+  else if (yearFrom !== undefined && yearTo !== undefined) phrases.push(['entre ', `${yearFrom} y ${yearTo}`])
+  else if (yearFrom !== undefined) phrases.push(['desde ', String(yearFrom)])
+  else if (yearTo !== undefined) phrases.push(['hasta ', String(yearTo)])
+  return phrases
+}
+
+/** A piece of the legend: the values chosen go in bold. */
+export type LegendPart = string | { strong: string }
+
+/**
+ * What the filters leave, in a sentence, as Letterboxd does: "Hay 1.474 películas del género Drama, hechas en
+ * Italia, estrenadas en los 2010s".
+ */
+export function legend(state: BrowseState, total: number, labels: FilterLabels): LegendPart[] {
+  const clauses: LegendPart[][] = []
+  const plural = total === 1 ? '' : 's'
+  const { genres, countries } = labels
+  if (genres.length) clauses.push([genres.length === 1 ? 'del género ' : 'de los géneros ', { strong: inWords(genres) }])
+  if (countries.length) clauses.push([`hecha${plural} en `, { strong: inWords(countries, 'o') }])
+  released(state).forEach(([words, value], index) =>
+    clauses.push([index ? words : `estrenada${plural} ${words}`, { strong: value }]),
+  )
+  if (state.q.trim()) clauses.push(['con ', { strong: `«${state.q.trim()}»` }, ' en el título'])
+  return ['Hay ', { strong: countMovies(total) }, ...clauses.flatMap((clause, index) => [index ? ', ' : ' ', ...clause]), '.']
+}
+
+/** The page title of the browser: the order, then each filter. */
+export function documentTitle(state: BrowseState, labels: FilterLabels): string {
+  return [
+    sectionTitle(state),
+    inWords(labels.genres),
+    ...released(state).map(([, value]) => value),
+    inWords(labels.countries, 'o'),
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }

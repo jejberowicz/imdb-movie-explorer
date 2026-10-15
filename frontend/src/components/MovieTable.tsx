@@ -11,6 +11,8 @@ interface MovieTableProps {
   order?: SortOrder
   /** With a search and no order chosen, the API orders by relevance; without one, by rating. */
   searching: boolean
+  /** The name of a country in Spanish, from GET /countries. */
+  countryName?: (name: string) => string
   onSort: (sort: SortField, order: SortOrder) => void
 }
 
@@ -18,6 +20,7 @@ const COLUMNS: { label: string; sort?: SortField; numeric?: boolean }[] = [
   { label: 'Título', sort: 'title' },
   { label: 'Año', sort: 'year' },
   { label: 'Géneros' },
+  { label: 'País' },
   { label: 'Duración', sort: 'duration' },
   { label: 'Rating', sort: 'rating', numeric: true },
   { label: 'Votos', sort: 'votes', numeric: true },
@@ -26,7 +29,7 @@ const COLUMNS: { label: string; sort?: SortField; numeric?: boolean }[] = [
 const defaultOrder = (sort: SortField): SortOrder => (sort === 'title' ? 'asc' : 'desc')
 
 /** The table view. A sortable header orders by its column; a second click reverses the order. */
-export function MovieTable({ movies, sort, order, searching, onSort }: MovieTableProps) {
+export function MovieTable({ movies, sort, order, searching, countryName = (name) => name, onSort }: MovieTableProps) {
   const current = sort === 'relevance' ? undefined : sort
   const currentOrder = order ?? (current ? defaultOrder(current) : undefined)
   const byRating = sort === 'rating' || (!sort && !searching)
@@ -85,6 +88,7 @@ export function MovieTable({ movies, sort, order, searching, onSort }: MovieTabl
               </td>
               <td>{movie.year}</td>
               <td>{movie.genres.map(genreLabel).join(', ')}</td>
+              <td>{movie.countries?.map(countryName).join(', ') ?? '—'}</td>
               <td className={styles.nowrap}>{formatDuration(movie.duration)}</td>
               <td className={styles.numeric}>{formatRating(movie.avg_vote)}</td>
               <td className={styles.numeric}>{formatNumber(movie.votes)}</td>

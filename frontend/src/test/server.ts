@@ -4,9 +4,25 @@ import type { MovieDetail, MovieSummary, Page } from '../api/movies'
 import { fold } from '../lib/text'
 import { COUNTRIES, DETAILS, GENRES } from './fixtures'
 
+/** GET /years over the fixtures. */
+export const YEARS = [...new Set(DETAILS.map((movie) => movie.year))]
+  .sort((a, b) => a - b)
+  .map((year) => ({ year, movies: DETAILS.filter((movie) => movie.year === year).length }))
+
 export function summary(movie: MovieDetail): MovieSummary {
-  const { imdb_title_id, original_title, year, genres, directors, duration, avg_vote, votes, weighted_rating } = movie
-  return { imdb_title_id, original_title, year, genres, directors, duration, avg_vote, votes, weighted_rating }
+  const { imdb_title_id, original_title, year, genres, directors, countries, duration, avg_vote, votes } = movie
+  return {
+    imdb_title_id,
+    original_title,
+    year,
+    genres,
+    directors,
+    countries,
+    duration,
+    avg_vote,
+    votes,
+    weighted_rating: movie.weighted_rating,
+  }
 }
 
 const SORT_KEYS: Record<string, (movie: MovieDetail) => number | string> = {
@@ -15,15 +31,17 @@ const SORT_KEYS: Record<string, (movie: MovieDetail) => number | string> = {
   votes: (movie) => movie.votes,
   year: (movie) => movie.year,
   duration: (movie) => movie.duration,
-  title: (movie) => movie.original_title,
+  // Like the API: folded, without the symbols at the start.
+  title: (movie) => fold(movie.original_title).replace(/^[^\p{L}\p{N}]+/u, ''),
 }
 
 /** GET /movies over the fixtures, like the API: search in both titles, filters, order and pages. */
 export function listMovies(url: URL): Page<MovieSummary> {
   const params = url.searchParams
   const title = fold(params.get('title') ?? '')
-  const genre = params.get('genre')
+  const genres = params.getAll('genre')
   const countries = params.getAll('country')
+  const decades = params.getAll('decade').map(Number)
   const from = Number(params.get('year_from') ?? 0)
   const to = Number(params.get('year_to') ?? 9999)
   const sort = params.get('sort') ?? (title ? 'relevance' : 'rating')
@@ -34,8 +52,9 @@ export function listMovies(url: URL): Page<MovieSummary> {
   const found = DETAILS.filter(
     (movie) =>
       (!title || fold(movie.original_title).includes(title) || fold(movie.italian_title).includes(title)) &&
-      (!genre || movie.genres.includes(genre)) &&
+      genres.every((genre) => movie.genres.includes(genre)) &&
       (!countries.length || countries.some((country) => movie.countries?.includes(country))) &&
+      (!decades.length || decades.some((decade) => movie.year >= decade && movie.year <= decade + 9)) &&
       movie.year >= from &&
       movie.year <= to,
   ).sort((a, b) => {
@@ -79,4 +98,5 @@ export const server = setupServer(
   }),
   http.get('/api/genres', () => HttpResponse.json({ items: GENRES })),
   http.get('/api/countries', () => HttpResponse.json({ items: COUNTRIES })),
+  http.get('/api/years', () => HttpResponse.json({ items: YEARS })),
 )

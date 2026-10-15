@@ -9,6 +9,7 @@ export interface MovieSummary {
   year: number
   genres: string[]
   directors: string[] | null
+  countries: string[] | null
   duration: number
   avg_vote: number
   votes: number
@@ -20,11 +21,9 @@ export interface Money {
   currency: string
 }
 
-export interface MovieDetail extends Omit<MovieSummary, 'directors'> {
+export interface MovieDetail extends MovieSummary {
   italian_title: string
-  countries: string[] | null
   languages: string[] | null
-  directors: string[] | null
   writers: string[] | null
   production_company: string | null
   actors: string[] | null
@@ -58,14 +57,20 @@ export interface CountryCount {
   former: boolean
 }
 
+export interface YearCount {
+  year: number
+  movies: number
+}
+
 export interface MovieQuery {
   title?: string
   page?: number
   pageSize?: number
   sort?: SortField
   order?: SortOrder
-  genre?: string
+  genres?: string[]
   countries?: string[]
+  decades?: number[]
   yearFrom?: number
   yearTo?: number
 }
@@ -79,8 +84,9 @@ export function fetchMovies(query: MovieQuery, signal?: AbortSignal): Promise<Pa
       page_size: query.pageSize,
       sort: query.sort,
       order: query.order,
-      genre: query.genre,
+      genre: query.genres,
       country: query.countries,
+      decade: query.decades,
       year_from: query.yearFrom,
       year_to: query.yearTo,
     },
@@ -98,4 +104,8 @@ export function fetchGenres(signal?: AbortSignal): Promise<{ items: GenreCount[]
 
 export function fetchCountries(signal?: AbortSignal): Promise<{ items: CountryCount[] }> {
   return getJson('/countries', {}, signal)
+}
+
+export function fetchYears(signal?: AbortSignal): Promise<{ items: YearCount[] }> {
+  return getJson('/years', {}, signal)
 }
