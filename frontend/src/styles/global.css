@@ -94,7 +94,8 @@ a {
   cursor: pointer;
 }
 
-.button:disabled {
+.button:disabled,
+.button[aria-disabled='true'] {
   opacity: 0.4;
   cursor: default;
 }

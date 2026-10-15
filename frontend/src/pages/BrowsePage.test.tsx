@@ -95,6 +95,29 @@ describe('browse page', () => {
     expect(searchOf(router)).toEqual({ page: ['2'] })
   })
 
+  it('keeps the keyboard focus on «Siguiente» when it reaches the last page', async () => {
+    server.use(
+      http.get('/api/movies', ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'))
+        const items = DETAILS.slice((page - 1) * 4, page * 4).map(summary)
+        return HttpResponse.json({ items, page, page_size: 24, total: 30, total_pages: 2 })
+      }),
+    )
+    const { router, user } = renderApp()
+    await screen.findByRole('link', { name: 'The Shawshank Redemption (1994)' })
+    const next = screen.getByRole('button', { name: 'Siguiente →' })
+
+    next.focus()
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('Página 2 de 2')).toBeInTheDocument()
+    expect(next).toHaveFocus()
+    expect(next).toHaveAttribute('aria-disabled', 'true')
+    // On the last page it does nothing.
+    await user.keyboard('{Enter}')
+    expect(searchOf(router)).toEqual({ page: ['2'] })
+  })
+
   it('goes to the last page from a page past the end', async () => {
     const seen = recordMovieRequests()
     const { router } = renderApp('/?genre=Drama&page=5000')
