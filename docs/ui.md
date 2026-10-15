@@ -60,9 +60,13 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
 | Goodfellas                   | 1990 | Biografía, Policial… | 2 h 26 min |    8,7 |   991.505 |
 ```
 
-- **Título, Rating y Votos ordenan**, y llevan `aria-sort`. Un clic ordena por esa columna y otro invierte el
-  orden. «Rating» ordena por el rating ponderado y muestra `avg_vote`
-  ([ADR 0008](decisions/0008-default-order.md)).
+- **Título, Año, Duración, Rating y Votos ordenan**, y llevan `aria-sort`, también para el orden por defecto. Un
+  clic ordena por esa columna y otro invierte el orden.
+- **«Rating» ordena por el rating ponderado y muestra `avg_vote`**
+  ([ADR 0008](decisions/0008-default-order.md)). Mientras la tabla está ordenada así, una nota arriba explica
+  que el orden tiene en cuenta la cantidad de votos.
+- **«Anterior» y «Siguiente» no se deshabilitan del todo** (`aria-disabled`): así, al llegar a la última página
+  con el teclado, el foco no se pierde.
 - **El botón «Tarjetas | Tabla» recuerda la elección** en `localStorage`. En pantallas angostas se ven siempre
   tarjetas, de a dos por fila.
 
@@ -126,7 +130,8 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
 |---|---|
 | Primera carga | Pósters o filas «esqueleto» con la forma del contenido |
 | Cargando con resultados previos | Siguen los resultados anteriores y una barra fina de progreso arriba. Nada parpadea |
-| Sin resultados | «No encontramos películas…» y, si hay filtros, «Limpiar filtros» |
+| Sin resultados | «No encontramos películas…» y, si hay filtros, «Limpiar filtros». Solo cuando el total es 0: una página más allá de la última lleva a la última |
+| Filtros que la API rechaza | «No pudimos buscar con estos filtros.» y «Limpiar filtros», porque reintentar no cambiaría nada. Casi no pasa: los valores de una URL compartida se acotan antes a los rangos de la API |
 | Error | «No pudimos cargar las películas.» y «Reintentar» |
 | Película inexistente | «Esa película no está en el catálogo.» y un link para volver |
 

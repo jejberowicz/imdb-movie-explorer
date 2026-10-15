@@ -44,7 +44,13 @@ Con ese CSV se prueba:
   - rechaza lo que debe, con su motivo;
   - correrla dos veces deja el mismo estado;
   - con el mismo archivo, la segunda corrida no hace nada;
-  - si los rechazos superan el umbral, falla sin tocar los datos anteriores.
+  - si los rechazos superan el umbral, falla sin tocar los datos anteriores;
+  - mientras escribe, otra conexión sigue leyendo las películas anteriores, sin esperar un lock.
+- **Un CSV roto a propósito:** una comilla sin cerrar (las filas tragadas cuentan como rechazadas), un campo
+  demasiado largo, caracteres invisibles, un NUL y números de miles de dígitos.
+- **Basura al azar, con semilla fija:** 10.000 filas con comillas, comas, controles, números enormes, otros
+  alfabetos e inyecciones, y archivos con líneas basura entre filas buenas. Cada fila termina cargada o
+  rechazada con su motivo, y el resumen cuenta todas las líneas del archivo.
 - **Los repositorios:** búsqueda, filtros, cada orden y la paginación en los bordes.
 
 ### API: el cliente de pruebas de Flask
@@ -53,6 +59,10 @@ Con ese CSV se prueba:
 - Validación: cada parámetro fuera de rango da 400 en formato Problem Details y sin stack trace.
 - Paginación en los bordes: la primera página, la última, una más allá de la última y `page_size` 1 y 100.
 - Los health checks: `/health/ready` da 503 si la base no responde.
+- La base caída, una consulta que pasa el `statement_timeout` y una conexión que nunca contesta dan 503 en
+  `/movies`, sin colgar al worker.
+- La seguridad: los headers, el 429 con `Retry-After`, el límite sumando todas las rutas (y los 404 y 405), y la
+  IP detrás del proxy.
 - `GET /genres` y `GET /countries` devuelven sus cantidades y se pueden cachear; `country` repetido devuelve
   las películas de cualquiera de esos países.
 

@@ -37,7 +37,8 @@ Godfather: Part II* (8,97) y *Pulp Fiction* (8,88), y *Suvarna Sundari* baja al 
 - **Es el orden por defecto sin búsqueda, y `sort=rating` lo aplica en cualquier caso.** Con búsqueda, el orden
   por defecto es la relevancia ([ADR 0004](0004-title-search-requirements.md)).
 - **La interfaz sigue mostrando `avg_vote`**, el rating que la gente conoce de IMDb, junto a la cantidad de
-  votos. El rating ponderado solo ordena, y un texto de ayuda explica que tiene en cuenta la cantidad de votos.
+  votos. El rating ponderado solo ordena, y un texto de ayuda explica que tiene en cuenta la cantidad de votos. Ese
+  texto está en la vista tabla, arriba de las filas; las tarjetas no lo tienen.
 
 ## Consecuencias
 

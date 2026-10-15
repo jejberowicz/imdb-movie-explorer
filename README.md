@@ -60,10 +60,11 @@ copiá `.env.example` a `.env`, que no se commitea.
 | `API_DB_PASSWORD` | `api-local-only` | Contraseña de `movies_api`, el usuario de solo lectura de la API |
 | `API_PORT`, `WEB_PORT` | `8000`, `8080` | Puertos publicados en esta máquina |
 | `GUNICORN_WORKERS` | `2` | Procesos de la API |
-| `RATE_LIMIT` | `300 per minute` | Pedidos permitidos por IP |
+| `RATE_LIMIT` | `300 per minute` | Pedidos permitidos por IP, sumando todas las rutas. Un valor inválido no deja arrancar la API |
 
 Las contraseñas se aplican cuando se crea la base: para cambiarlas después, primero `docker compose down -v`.
-La base no se publica fuera de la red de Docker.
+La base no se publica: está en una red interna de Docker que solo comparten la carga y la API, así que ni nginx
+llega a ella.
 
 ### Sin Docker
 
@@ -128,7 +129,8 @@ curl "http://localhost:8000/movies?page_size=100000&sort=title;DROP%20TABLE%20mo
 
 Las respuestas de `GET /movies` traen `items`, `page`, `page_size`, `total` y `total_pages`. Los errores
 siguen el formato Problem Details (RFC 9457): 400 con cada parámetro inválido y su motivo, 404 si la
-película no existe y 429 si se pasa el límite de pedidos. Nunca devuelven un stack trace.
+película no existe, 429 si se pasa el límite de pedidos (de la API, o el más grueso de nginx) y 503 si la base no
+responde. Nunca devuelven un stack trace.
 
 - **Referencia completa**, con ejemplos de cada respuesta: [docs/api.md](docs/api.md).
 - **Swagger UI**, para probarla desde el navegador: http://localhost:8000/docs/swagger.
@@ -139,7 +141,7 @@ película no existe y 429 si se pasa el límite de pedidos. Nunca devuelven un s
 ## Tests
 
 ```bash
-# Backend: 162 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
+# Backend: 191 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
 cd backend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=movies \
@@ -147,7 +149,7 @@ docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=mo
 docker exec imdb-dev-db psql -U movies -c "CREATE DATABASE movies_test"
 TEST_DATABASE_URL=postgresql+psycopg://movies:movies@localhost:5433/movies_test .venv/bin/pytest
 
-# Front: 51 tests con Vitest, React Testing Library y MSW
+# Front: 66 tests con Vitest, React Testing Library y MSW
 cd frontend
 npm ci
 npm test

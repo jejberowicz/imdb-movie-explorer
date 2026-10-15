@@ -23,7 +23,8 @@ flowchart LR
   quedan en el mismo origen, así que CORS no hace falta.
 - **La API también se publica en `http://localhost:8000`**, para probarla con `curl` o Postman, como pide la
   consigna.
-- **La base no se publica fuera de la red de Docker.**
+- **La base no se publica**, y está en una red interna de Docker (`backend`) que solo comparten la carga y la
+  API. nginx está en otra (`frontend`), con la API: no llega a la base.
 
 ### Orden de arranque
 
@@ -31,7 +32,7 @@ flowchart LR
 
 | Servicio | Qué hace | Listo cuando |
 |---|---|---|
-| `db` | PostgreSQL 18 | `pg_isready` responde |
+| `db` | PostgreSQL 18 | `pg_isready` responde por TCP: el socket local ya contesta mientras la base se inicializa |
 | `seed` | Aplica las migraciones y carga el CSV. Si ese mismo archivo ya está cargado, según su SHA-256, termina sin hacer nada | Termina con código 0 |
 | `api` | Gunicorn con la app de Flask | `GET /health/ready` responde 200 |
 | `web` | nginx con la app compilada | Responde en el puerto 8080 |
@@ -75,7 +76,7 @@ backend/
     countries.py        nombre del país en el CSV → código ISO donde se pinta en el mapa
     text.py             plegado del texto, el mismo para la carga y para la búsqueda
     etl/                parseo, reglas del ADR 0003 y comando seed
-  migrations/           Alembic
+  migrations/           Alembic; la 0004 da a la API permiso de lectura sobre sus dos tablas
   scripts/              EXPLAIN de las consultas y medición de p50 y p95
   tests/                parseo, carga, API, seguridad, criterios de aceptación y fixtures/ (CSV chicos)
   Dockerfile
@@ -187,7 +188,10 @@ unos milisegundos, y `EXPLAIN ANALYZE` no mostró que hiciera falta ([performanc
 
 1. Calcula el SHA-256 del archivo. Si coincide con el de la última carga exitosa, termina.
 2. Lee el `.gz` como texto y aplica a cada fila las reglas del [ADR 0003](decisions/0003-data-cleaning-rules.md).
-   Una fila que no se puede interpretar va a `load_rejections` con su motivo; las demás siguen.
+   Una fila que no se puede interpretar va a `load_rejections` con su motivo; las demás siguen. Eso incluye las
+   filas rotas: comas de más o de menos, un salto de línea dentro de un campo (una comilla sin cerrar, que se
+   traga las filas siguientes: cada línea tragada cuenta como rechazada) y campos de más de 2.000 caracteres.
+   Un archivo que no es UTF-8 o que no se puede leer como CSV corta la carga sin escribir nada.
 3. Calcula C y m, y el rating ponderado de cada película.
 4. En una sola transacción, borra las películas con `DELETE`, carga las nuevas con `COPY` y registra la corrida en
    `load_runs`. Mientras tanto, la API sigue viendo los datos anteriores: `DELETE`, a diferencia de `TRUNCATE`,
@@ -201,7 +205,9 @@ unos milisegundos, y `EXPLAIN ANALYZE` no mostró que hiciera falta ([performanc
 - **El superusuario** solo administra, desde adentro del contenedor: por la red no puede entrar.
 - **El dueño, `movies`,** (migraciones y seed) crea tablas y escribe, pero no es superusuario: con su
   contraseña no se pueden correr comandos en el servidor.
-- **El de la API, `movies_api`,** solo puede leer (`SELECT`), todas sus transacciones son de solo lectura y
-  tiene un `statement_timeout` de 5 s, para cortar cualquier consulta inesperadamente cara. Lo crea
-  `db/init/01-roles.sh` cuando se crea la base.
+- **El de la API, `movies_api`,** solo tiene `SELECT` sobre `movies` y `load_runs`, las dos tablas que usa: no
+  puede escribir, crear tablas temporales ni conectarse a otras bases. Lo crea `db/init/01-roles.sh` cuando se
+  crea la base, y la migración 0004 le da esos permisos. Además, por defecto sus transacciones son de solo
+  lectura y tiene un `statement_timeout` de 5 s; son valores que la sesión podría cambiar, así que la barrera
+  real son los permisos.
 - Las credenciales llegan por variables de entorno. En el repo solo está `.env.example`, sin valores reales.

@@ -86,6 +86,17 @@ P291, consultada el 2026-10-15):
 ## Consecuencias
 
 - Cada regla tiene tests unitarios en la carga de datos, con estos casos borde.
+- **Un archivo roto tampoco frena la carga, salvo que no se pueda leer** (agregado el 15/10):
+  - una fila con comas de más o de menos, con un salto de línea dentro de un campo, o con un campo de más de
+    2.000 caracteres se rechaza. El CSV real no tiene saltos de línea en sus campos, y su campo más largo tiene
+    415 caracteres;
+  - un salto de línea así es casi siempre una comilla que no cierra y se traga las filas siguientes: cada línea
+    tragada cuenta como una fila rechazada, para que el umbral del 1 % la vea;
+  - un archivo que no es UTF-8, o un campo de más de 128 KB, corta la carga sin escribir nada;
+  - se sacan los caracteres invisibles y de control (como U+202E, que muestra un texto al revés), después de
+    reparar el mojibake. Los títulos con símbolos se guardan tal cual: van por `COPY` parametrizado y la
+    interfaz los muestra como texto.
+  Con el CSV real nada de esto cambia el resultado: 85.855 películas, 0 rechazos.
 - El resumen de la carga informa cuántos valores corrigió cada regla y cuántas filas rechazó.
 - Rechazar una fila no es perderla: se guarda con su contenido original y el motivo. Si después se ajusta
   una regla, se vuelve a correr la carga, que deja siempre el mismo estado aunque se corra dos veces.

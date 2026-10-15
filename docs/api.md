@@ -19,7 +19,7 @@ Devuelve una página de películas. Con `title`, filtra por título.
 
 | Parámetro | Tipo | Por defecto | Reglas |
 |---|---|---|---|
-| `title` | texto | — | Hasta 200 caracteres. Se recortan los espacios de los extremos y los repetidos. Vacío equivale a no filtrar |
+| `title` | texto | — | Hasta 200 caracteres. Se recortan los espacios de los extremos y los repetidos. Sin caracteres de control. Vacío, o sin ninguna letra una vez quitados los acentos (por ejemplo, una tilde suelta), equivale a no filtrar |
 | `page` | entero | 1 | 1 o más |
 | `page_size` | entero | 20 | Entre 1 y 100 |
 | `sort` | `relevance`, `rating`, `year`, `votes`, `duration`, `title` | `relevance` si hay `title`; si no, `rating` | `relevance` solo vale con `title`. `rating` es el rating ponderado |
@@ -146,9 +146,10 @@ El ejemplo está recortado: son 194 países.
 |---|---|
 | 400 | Un parámetro inválido: `page=0`, `page_size=100000`, un `sort` fuera de la lista, un id con otro formato… |
 | 404 | El id tiene un formato válido, pero no existe |
-| 429 | Más de 300 pedidos por minuto desde una misma IP (configurable con `RATE_LIMIT`). Incluye `Retry-After` |
+| 405 | Un método que la ruta no acepta. Incluye `Allow`, con los que sí acepta |
+| 429 | Más de 300 pedidos por minuto desde una misma IP, sumando todas las rutas (configurable con `RATE_LIMIT`). Incluye `Retry-After`. A través de nginx hay además un límite más grueso, de 10 por segundo con ráfagas de 50, que responde lo mismo con `Retry-After: 1` |
 | 500 | Un error inesperado. El detalle queda en el log, nunca en la respuesta |
-| 503 | La base no responde o todavía no hay datos cargados |
+| 503 | La base no responde, una consulta pasó el `statement_timeout`, o todavía no hay datos cargados |
 
 `GET /movies?page_size=100000&sort=title;DROP TABLE movies`:
 
