@@ -1,5 +1,6 @@
 """The load against a real PostgreSQL: cleaning rules, rejections, threshold, idempotency and audit."""
 
+import csv
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,19 @@ def movie(engine: Engine, imdb_title_id: str) -> dict[str, Any]:
 def count(engine: Engine, table: Any) -> int:
     with engine.connect() as conn:
         return conn.execute(select(func.count()).select_from(table)).scalar_one()
+
+
+def write_csv(path: Path, *changes: dict[str, str]) -> Path:
+    """A CSV with one row per change: the first movie of the sample, with those fields replaced."""
+    with SAMPLE_CSV.open(encoding="utf-8", newline="") as sample:
+        reader = csv.DictReader(sample)
+        base = next(reader)
+        fieldnames = reader.fieldnames or []
+    with path.open("w", encoding="utf-8", newline="") as out:
+        writer = csv.DictWriter(out, fieldnames)
+        writer.writeheader()
+        writer.writerows({**base, **change} for change in changes)
+    return path
 
 
 def load_edge_cases(engine: Engine) -> Any:
@@ -108,6 +122,41 @@ class TestRejections:
         load(empty_db, SAMPLE_CSV)
         with pytest.raises(LoadError, match="over the 1% threshold"):
             load(empty_db, EDGE_CASES_CSV, today=TODAY)
+        assert count(empty_db, movies) == 16
+        assert count(empty_db, load_runs) == 1
+
+    def test_a_nul_character_in_a_rejected_row_is_dropped_from_its_copy(self, empty_db: Engine, tmp_path: Path) -> None:
+        """JSONB can't hold a NUL either: saving the rejected row made the whole load fail."""
+        path = write_csv(tmp_path / "nul.csv", {}, {"imdb_title_id": "tt\x009000005", "description": "a\x00b"})
+        summary = load(empty_db, path, max_rejected_share=1)
+        assert (summary.rows_loaded, summary.rejections) == (1, {"malformed imdb_title_id": 1})
+        with empty_db.connect() as conn:
+            rejection = conn.execute(select(load_rejections)).mappings().one()
+        assert rejection["imdb_title_id"] == "tt9000005"
+        assert rejection["raw"]["description"] == "ab"
+
+    def test_a_number_with_thousands_of_digits_only_rejects_its_row(self, empty_db: Engine, tmp_path: Path) -> None:
+        huge = "9" * 5000
+        path = write_csv(
+            tmp_path / "huge.csv",
+            {},
+            {"imdb_title_id": "tt9000006", "votes": huge},
+            {"imdb_title_id": "tt9000007", "reviews_from_users": huge, "budget": f"$ {huge}"},
+        )
+        summary = load(empty_db, path, max_rejected_share=1)
+        assert (summary.rows_loaded, summary.rejections) == (2, {"votes out of range": 1})
+        assert summary.corrections["invalid_reviews_from_users_dropped"] == 1
+        assert summary.corrections["invalid_budget_dropped"] == 1
+        assert movie(empty_db, "tt9000007")["budget_amount"] is None
+
+    def test_a_field_over_the_csv_limit_cancels_the_load_with_a_clear_error(
+        self, empty_db: Engine, tmp_path: Path
+    ) -> None:
+        """Usually a quote that never closes: the rest of the file becomes one field, and can't be trusted."""
+        load(empty_db, SAMPLE_CSV)
+        path = write_csv(tmp_path / "long.csv", {}, {"imdb_title_id": "tt9000008", "description": "x" * 200_000})
+        with pytest.raises(LoadError, match=r"long\.csv can't be read after line 2: field larger than field limit"):
+            load(empty_db, path)
         assert count(empty_db, movies) == 16
         assert count(empty_db, load_runs) == 1
 

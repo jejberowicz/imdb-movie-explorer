@@ -198,7 +198,16 @@ def load(
         summary.skipped = True
         return summary
     with open_csv_bytes(path) as raw, io.TextIOWrapper(raw, encoding="utf-8-sig", newline="") as stream:
-        movies, rejected = _clean_rows(csv.DictReader(stream), path, summary, (today or date.today()).year)
+        reader = csv.DictReader(stream)
+        try:
+            movies, rejected = _clean_rows(reader, path, summary, (today or date.today()).year)
+        except (csv.Error, UnicodeDecodeError) as error:
+            # Not one bad row but a broken file: usually a quote that never closes, which turns the rest of the
+            # file into one field until it goes over the limit of the csv module (128 KiB). No row after that
+            # point can be trusted, so the load stops, instead of raising the limit and losing them in silence.
+            raise LoadError(
+                f"{path.name} can't be read after line {reader.line_num}: {error}. Nothing was loaded."
+            ) from error
 
     if summary.rows_read and summary.rows_rejected / summary.rows_read > max_rejected_share:
         raise LoadError(
@@ -244,7 +253,8 @@ def _clean_rows(
                 raise InvalidValue("duplicate imdb_title_id")
         except InvalidValue as error:
             summary.rejections[str(error)] += 1
-            rejected.append(Rejection(reader.line_num, row.get("imdb_title_id"), str(error), _raw(row)))
+            raw = _raw(row)
+            rejected.append(Rejection(reader.line_num, raw.get("imdb_title_id"), str(error), raw))
             continue
         seen.add(movie["imdb_title_id"])
         summary.corrections.update(corrections)
@@ -291,8 +301,15 @@ def _last_loaded_sha256(engine: Engine) -> str | None:
 
 
 def _raw(row: dict[str | None, Any]) -> dict[str, Any]:
-    """The row as it came, for load_rejections. Extra fields (under the None key) are kept apart."""
-    raw = {key: value for key, value in row.items() if key is not None}
+    """The row as it came, for load_rejections. Extra fields (under the None key) are kept apart.
+
+    Except for NUL characters: neither text nor JSONB can store them, and one would make the whole load fail.
+    """
+
+    def without_nul(value: str | None) -> str | None:
+        return value.replace("\x00", "") if value is not None else None
+
+    raw = {without_nul(key): without_nul(value) for key, value in row.items() if key is not None}
     if None in row:
-        raw["_extra_fields"] = row[None]
+        raw["_extra_fields"] = [without_nul(value) for value in row[None]]
     return raw

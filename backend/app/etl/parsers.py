@@ -23,6 +23,8 @@ _MOJIBAKE = re.compile(r"Ã[\x80-\xbf]|Â[\x80-\xbf]|â€")
 _BIGINT_MAX = 2**63 - 1
 INT_MAX = 2**31 - 1
 SMALLINT_MAX = 2**15 - 1
+# No column holds more digits than a bigint. Over 4,300, int() raises a plain ValueError instead of rejecting the row.
+_MAX_DIGITS = len(str(_BIGINT_MAX))
 
 
 class InvalidValue(ValueError):
@@ -38,6 +40,14 @@ def parse_id(text: str) -> str:
     if not _ID.fullmatch(text):
         raise InvalidValue("malformed imdb_title_id")
     return text
+
+
+def _to_int(digits: str, reason: str) -> int:
+    """The integer of a string of ASCII digits; one too long for any column is an InvalidValue with that reason."""
+    significant = digits.lstrip("0") or "0"
+    if len(significant) > _MAX_DIGITS:
+        raise InvalidValue(reason)
+    return int(significant)
 
 
 def _clean(text: str) -> str:
@@ -72,9 +82,10 @@ def parse_year(text: str, max_year: int) -> tuple[int, str | None]:
 
 def parse_count(text: str, column: str, minimum: int = 0, maximum: int = INT_MAX) -> int:
     """A required integer within the range of its column: votes, duration."""
-    if not _COUNT.fullmatch(text.strip()):
+    value_text = text.strip()
+    if not _COUNT.fullmatch(value_text):
         raise InvalidValue(f"malformed {column}")
-    value = int(text)
+    value = _to_int(value_text, f"{column} out of range")
     if not minimum <= value <= maximum:
         raise InvalidValue(f"{column} out of range")
     return value
@@ -88,9 +99,10 @@ def parse_whole(text: str) -> tuple[int | None, str | None]:
     match = _WHOLE.fullmatch(value)
     if not match:
         raise InvalidValue("not a whole number")
-    if int(match.group(1)) > INT_MAX:
+    number = _to_int(match.group(1), "number out of range")
+    if number > INT_MAX:
         raise InvalidValue("number out of range")
-    return int(match.group(1)), ("whole_from_decimal" if match.group(2) else None)
+    return number, ("whole_from_decimal" if match.group(2) else None)
 
 
 def parse_score(text: str) -> tuple[int | None, str | None]:
@@ -115,7 +127,7 @@ def parse_money(text: str) -> tuple[Money | None, str | None]:
     match = _MONEY.fullmatch(value)
     if not match:
         raise InvalidValue("malformed amount")
-    symbol, amount = match.group(1), int(match.group(2))
+    symbol, amount = match.group(1), _to_int(match.group(2), "amount too large")
     if amount == 0:
         return None, "zero_amount_to_null"
     if amount > _BIGINT_MAX:
