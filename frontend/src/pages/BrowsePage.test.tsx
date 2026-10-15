@@ -273,6 +273,8 @@ describe('table view', () => {
 
     await user.click(screen.getByRole('button', { name: 'Tabla' }))
     const table = screen.getByRole('table')
+    // The default order is by rating, and the header says so before anything is chosen.
+    expect(within(table).getByRole('columnheader', { name: /Rating/ })).toHaveAttribute('aria-sort', 'descending')
     expect(within(table).getAllByRole('row')).toHaveLength(9)
     expect(localStorage.getItem('fakeimdb:view')).toBe('table')
 

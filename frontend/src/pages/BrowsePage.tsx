@@ -116,7 +116,8 @@ export default function BrowsePage() {
             ) : (
               <MovieTable
                 movies={data.items}
-                sort={state.sort}
+                // Without a chosen order the API sorts by relevance with a search and by rating without one
+                sort={state.sort ?? (state.q.trim() ? 'relevance' : 'rating')}
                 order={state.order}
                 searching={Boolean(state.q.trim())}
                 onSort={(sort, order) => change({ sort, order, page: 1 })}
