@@ -127,16 +127,19 @@ class TestRejections:
 
     def test_a_nul_character_in_a_rejected_row_is_dropped_from_its_copy(self, empty_db: Engine, tmp_path: Path) -> None:
         """JSONB can't hold a NUL either: saving the rejected row made the whole load fail."""
-        path = write_csv(tmp_path / "nul.csv", {}, {"imdb_title_id": "tt\x009000005", "description": "a\x00b"})
+        path = write_csv(
+            tmp_path / "nul.csv", {}, {"imdb_title_id": "tt9000005", "votes": "many", "description": "a\x00b"}
+        )
         summary = load(empty_db, path, max_rejected_share=1)
-        assert (summary.rows_loaded, summary.rejections) == (1, {"malformed imdb_title_id": 1})
+        assert (summary.rows_loaded, summary.rejections) == (1, {"malformed votes": 1})
         with empty_db.connect() as conn:
             rejection = conn.execute(select(load_rejections)).mappings().one()
         assert rejection["imdb_title_id"] == "tt9000005"
         assert rejection["raw"]["description"] == "ab"
 
     def test_a_number_with_thousands_of_digits_only_rejects_its_row(self, empty_db: Engine, tmp_path: Path) -> None:
-        huge = "9" * 5000
+        # More digits than any bigint, but still a field of normal length (5.000 would be "field too long").
+        huge = "9" * 1000
         path = write_csv(
             tmp_path / "huge.csv",
             {},

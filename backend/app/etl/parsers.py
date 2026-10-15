@@ -50,6 +50,18 @@ def _to_int(digits: str, reason: str) -> int:
     return int(significant)
 
 
+# Characters that change how a text is shown without being part of it: C0 and C1 controls, the bidirectional
+# overrides and isolates (U+202E can show "txt.exe" as "exe.txt"), the zero-width space, the line and paragraph
+# separators and a BOM in the middle of a text. ZWJ and ZWNJ (U+200C, U+200D) stay: emoji and several scripts
+# need them. The CSV has none of these once its mojibake is repaired.
+_INVISIBLE = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f\u200b\u2028\u2029\u202a-\u202e\u2066-\u2069\ufeff]")
+
+
+def strip_invisible(text: str) -> str:
+    """The text without invisible or control characters; a tab becomes a space."""
+    return _INVISIBLE.sub("", text.replace("\t", " "))
+
+
 def _clean(text: str) -> str:
     # PostgreSQL can't store the NUL character in a text column: one would make the whole COPY fail.
     return text.replace("\x00", "").strip()
