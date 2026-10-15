@@ -149,6 +149,18 @@ describe('browse page', () => {
     ])
   })
 
+  it('keeps the space when the user pauses between two words', async () => {
+    const { router, user } = renderApp()
+    await screen.findByRole('link', { name: 'Stalker (1979)' })
+
+    await user.type(searchBox(), 'the ')
+    await wait(400)
+    await user.type(searchBox(), 'god')
+
+    expect(searchBox()).toHaveValue('the god')
+    await waitFor(() => expect(searchOf(router)).toEqual({ q: ['the god'] }))
+  })
+
   it('changes the URL once per search: Enter and the back button don\'t make it bounce', async () => {
     const { router, user } = renderApp()
     await screen.findByRole('link', { name: 'Stalker (1979)' })

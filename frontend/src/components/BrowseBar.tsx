@@ -105,8 +105,10 @@ function SearchBox({ value, onSearch }: SearchBoxProps) {
   // The last value this box sent: a different one in the URL comes from outside (back button, «Limpiar»).
   const sent = useRef(value)
 
+  // The URL keeps the text trimmed: "the " sent and "the" back is the same search, not a change from outside
+  // (comparing them as they are erased the space while the user paused between two words).
   useEffect(() => {
-    if (value !== sent.current) {
+    if (value.trim() !== sent.current.trim()) {
       sent.current = value
       setText(value)
     }
