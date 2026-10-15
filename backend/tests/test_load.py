@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine, func, select
+from sqlalchemy import Engine, func, select, text
 
+from app.etl import load as load_module
 from app.etl.load import LoadError, load
 from app.models import load_rejections, load_runs, movies
 from tests.conftest import EDGE_CASES_CSV, SAMPLE_CSV
@@ -161,3 +162,19 @@ class TestAudit:
         load(empty_db, SAMPLE_CSV)
         assert movie(empty_db, "tt0402022")["original_title_search"] == "aeon flux"
         assert movie(empty_db, "tt0211915")["italian_title_search"] == "il favoloso mondo di amelie"
+
+
+def test_readers_keep_the_old_movies_until_the_load_commits(sample_db: Engine, monkeypatch: pytest.MonkeyPatch) -> None:
+    """While a load writes, the API reads the previous movies instead of waiting for a lock."""
+    seen: list[int] = []
+    write = load_module._write
+
+    def write_then_read(conn: Any, *args: Any) -> None:
+        write(conn, *args)
+        with sample_db.connect() as reader:
+            reader.execute(text("SET lock_timeout = '1s'"))
+            seen.append(reader.execute(select(func.count()).select_from(movies)).scalar_one())
+
+    monkeypatch.setattr(load_module, "_write", write_then_read)
+    load(sample_db, EDGE_CASES_CSV, max_rejected_share=1)
+    assert seen == [16]

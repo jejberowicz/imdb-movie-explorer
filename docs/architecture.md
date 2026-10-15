@@ -189,8 +189,10 @@ unos milisegundos, y `EXPLAIN ANALYZE` no mostró que hiciera falta ([performanc
 2. Lee el `.gz` como texto y aplica a cada fila las reglas del [ADR 0003](decisions/0003-data-cleaning-rules.md).
    Una fila que no se puede interpretar va a `load_rejections` con su motivo; las demás siguen.
 3. Calcula C y m, y el rating ponderado de cada película.
-4. En una sola transacción, vacía `movies`, la llena con `COPY` y registra la corrida en `load_runs`. Mientras
-   tanto, la API sigue viendo los datos anteriores.
+4. En una sola transacción, borra las películas con `DELETE`, carga las nuevas con `COPY` y registra la corrida en
+   `load_runs`. Mientras tanto, la API sigue viendo los datos anteriores: `DELETE`, a diferencia de `TRUNCATE`,
+   no bloquea las lecturas. Al terminar, `VACUUM` libera las filas borradas, sin el paso final que sí
+   bloquearía, y `ANALYZE` actualiza las estadísticas.
 5. Si los rechazos superan el 1 % de las filas, la transacción se cancela y el seed falla con el resumen. Con el
    CSV actual se espera 0.
 

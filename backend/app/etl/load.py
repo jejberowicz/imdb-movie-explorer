@@ -3,8 +3,8 @@
 - A row that can't be read doesn't stop the load: it is set aside in load_rejections, with its reason.
 - If the rejected rows go over a threshold (1% by default), nothing is written and the load fails.
 - The same file as the last load (same SHA-256) means there is nothing to do.
-- Otherwise the movies are replaced in one transaction with COPY: readers see the old data until the commit,
-  and running the load twice leaves the same state.
+- Otherwise the movies are replaced in one transaction with DELETE and COPY: readers see the old data until the
+  commit, and running the load twice leaves the same state.
 """
 
 import csv
@@ -216,6 +216,11 @@ def load(
     summary.rows_loaded = len(movies)
     with engine.begin() as conn:
         _write(conn, movies, rejected, summary)
+    # The deleted rows take space until a vacuum, and the planner needs statistics of the new ones. TRUNCATE false:
+    # by default VACUUM ends by cutting the empty pages off the file, with a lock that does block readers. It
+    # can't run inside a transaction.
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text("VACUUM (TRUNCATE false, ANALYZE) movies"))
     return summary
 
 
@@ -271,7 +276,9 @@ def _write(conn: Connection, movies: list[dict[str, Any]], rejected: list[Reject
                 for r in rejected
             ],
         )  # fmt: skip
-    conn.execute(text("TRUNCATE movies"))
+    # DELETE and not TRUNCATE: TRUNCATE locks the table even for readers, so the API would wait, and fail after
+    # its statement_timeout, until the load commits. With DELETE, readers keep seeing the old rows meanwhile.
+    conn.execute(text("DELETE FROM movies"))
     cursor = conn.connection.dbapi_connection.cursor()
     with cursor.copy(f"COPY movies ({', '.join(MOVIE_COLUMNS)}) FROM STDIN") as copy:
         for movie in movies:
