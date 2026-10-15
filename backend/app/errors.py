@@ -43,7 +43,13 @@ def validation_problem(error: ValidationError) -> Response:
 def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(HTTPException)
     def http_error(error: HTTPException) -> Response:
-        return problem(error.code or 500, error.description)
+        response = problem(error.code or 500, error.description)
+        # Headers that are part of the error, like the Allow of a 405 (RFC 9110). The body is ours, so its type
+        # and length are not.
+        for name, value in error.get_headers():
+            if name.lower() not in {"content-type", "content-length"}:
+                response.headers[name] = value
+        return response
 
     @app.errorhandler(Exception)
     def unexpected_error(error: Exception) -> Response:

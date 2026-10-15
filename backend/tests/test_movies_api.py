@@ -232,6 +232,9 @@ class TestErrors:
         response = client.post("/movies")
         assert response.status_code == 405
         assert response.get_json()["title"] == "Method Not Allowed"
+        # RFC 9110: a 405 says which methods the resource does accept.
+        assert set(response.headers["Allow"].split(", ")) >= {"GET", "HEAD"}
+        assert response.mimetype == "application/problem+json"
 
     def test_unexpected_errors_never_show_internals(self, client: FlaskClient, monkeypatch) -> None:
         def boom(*args, **kwargs):
