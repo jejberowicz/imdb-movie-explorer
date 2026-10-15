@@ -3,8 +3,9 @@
 import logging
 from http import HTTPStatus
 
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 from pydantic import BaseModel, ValidationError
+from sqlalchemy.exc import OperationalError
 from werkzeug.exceptions import HTTPException
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,21 @@ def validation_problem(error: ValidationError) -> Response:
 def register_error_handlers(app: Flask) -> None:
     @app.errorhandler(HTTPException)
     def http_error(error: HTTPException) -> Response:
-        return problem(error.code or 500, error.description)
+        response = problem(error.code or 500, error.description)
+        # Headers that are part of the error, like the Allow of a 405 (RFC 9110). The body is ours, so its type
+        # and length are not.
+        for name, value in error.get_headers():
+            if name.lower() not in {"content-type", "content-length"}:
+                response.headers[name] = value
+        return response
+
+    @app.errorhandler(OperationalError)
+    def database_unavailable(error: OperationalError) -> Response:
+        # Down, restarting, or a query over the statement_timeout: not a bug of the API, and while it lasts it
+        # hits every request. One line each is enough; a traceback per request would bury the log.
+        reason = str(error.orig or error).strip().splitlines()[0]
+        logger.error("Database unavailable on %s %s: %s", request.method, request.path, reason)
+        return problem(503, "The database is not available.")
 
     @app.errorhandler(Exception)
     def unexpected_error(error: Exception) -> Response:

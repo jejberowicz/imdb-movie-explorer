@@ -2,7 +2,8 @@
 FROM node:24.22.0-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
-RUN npm ci --no-audit --no-fund
+# Without install scripts: no dependency needs one, and a compromised one couldn't run code at build time.
+RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY . .
 RUN npm run build
 

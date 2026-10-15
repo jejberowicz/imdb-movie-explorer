@@ -72,6 +72,19 @@ class TestRequiredNumbers:
         with pytest.raises(InvalidValue, match="duration out of range"):
             parse_count("40000", "duration", maximum=32767)
 
+    def test_numbers_too_long_for_int_are_invalid_values(self) -> None:
+        """int() refuses more than 4,300 digits with a plain ValueError, which stopped the whole load."""
+        huge = "9" * 5000
+        with pytest.raises(InvalidValue, match="votes out of range"):
+            parse_count(huge, "votes")
+        with pytest.raises(InvalidValue, match="number out of range"):
+            parse_whole(huge + ".0")
+        with pytest.raises(InvalidValue, match="amount too large"):
+            parse_money(f"$ {huge}")
+
+    def test_leading_zeros_do_not_count_as_digits(self) -> None:
+        assert parse_count("0" * 5000 + "42", "votes") == 42
+
     @pytest.mark.parametrize(("text", "expected"), [("80.0", (80, "whole_from_decimal")), ("0", (0, None))])
     def test_score(self, text: str, expected: tuple[int, str | None]) -> None:
         assert parse_score(text) == expected

@@ -10,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-type Params = Record<string, string | number | readonly string[] | undefined>
+type Params = Record<string, string | number | readonly (string | number)[] | undefined>
 
 /** GET a JSON resource. Empty parameters are left out; arrays repeat the parameter. */
 export async function getJson<T>(path: string, params: Params = {}, signal?: AbortSignal): Promise<T> {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import type { SortField, SortOrder } from '../api/movies'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { type BrowseState, browsePath, DECADES, decadeOf } from '../lib/browse'
+import { type BrowseState, browsePath, DECADES, toggle } from '../lib/browse'
 import { GENRES_ES, genreLabel } from '../lib/genres'
 import styles from './BrowseBar.module.css'
 import { Dropdown, type Option } from './Dropdown'
@@ -12,6 +12,8 @@ type SortChoice = `${SortField}-${SortOrder}`
 interface BrowseBarProps {
   state: BrowseState
   genres: string[]
+  /** The decades with movies, newest first; DECADES until the API answers. */
+  decades?: number[]
   /** Change the state; `replace` keeps the history clean while typing. */
   onChange: (changes: Partial<BrowseState>, replace?: boolean) => void
 }
@@ -29,11 +31,15 @@ const NAME: Option<SortChoice>[] = [
   { label: 'De la Z a la A', value: 'title-desc' },
 ]
 
-/** «Explorar por»: a menu per criterion, as in Letterboxd, and the search on the right (docs/ui.md). */
-export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
+/**
+ * «Explorar por»: a menu per criterion, as in Letterboxd, and the search on the right (docs/ui.md). Año and Género
+ * allow several; in every menu, choosing again what is chosen takes it out.
+ */
+export function BrowseBar({ state, genres, decades = DECADES, onChange }: BrowseBarProps) {
   const navigate = useNavigate()
   const sortChoice = state.sort ? (`${state.sort}-${state.order ?? (state.sort === 'title' ? 'asc' : 'desc')}` as SortChoice) : undefined
   const sortBy = (choice: SortChoice) => {
+    if (choice === sortChoice) return onChange({ sort: undefined, order: undefined, page: 1 })
     const [sort, order] = choice.split('-') as [SortField, SortOrder]
     onChange({ sort, order, page: 1 })
   }
@@ -45,7 +51,7 @@ export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
   ]
   const decadeOptions: Option<number | null>[] = [
     { label: 'Todas', value: null },
-    ...DECADES.map((decade) => ({ label: `${decade}s`, value: decade })),
+    ...decades.map((decade) => ({ label: `${decade}s`, value: decade })),
   ]
   const countryOptions: Option<string>[] = [
     { label: 'Ver el mapa de países', value: 'map' },
@@ -61,10 +67,18 @@ export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
         <Dropdown
           label="Año"
           options={decadeOptions}
-          selected={decadeOf(state) ?? null}
-          active={state.yearFrom !== undefined || state.yearTo !== undefined}
+          multiple
+          selected={state.decades.length ? state.decades : [null]}
+          active={state.decades.length > 0 || state.years.length > 0 || state.yearFrom !== undefined || state.yearTo !== undefined}
+          // The years chosen in the strip belong to one decade: another set of decades starts without them.
           onSelect={(decade) =>
-            onChange({ yearFrom: decade ?? undefined, yearTo: decade === null ? undefined : decade + 9, page: 1 })
+            onChange({
+              decades: decade === null ? [] : toggle(state.decades, decade).sort((a, b) => b - a),
+              years: [],
+              yearFrom: undefined,
+              yearTo: undefined,
+              page: 1,
+            })
           }
         />
         <Dropdown label="Rating" options={RATING} selected={sortChoice} active={state.sort === 'rating'} onSelect={sortBy} />
@@ -72,14 +86,16 @@ export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
         <Dropdown
           label="Género"
           options={genreOptions}
-          selected={state.genre ?? null}
-          active={Boolean(state.genre)}
-          onSelect={(genre) => onChange({ genre: genre ?? undefined, page: 1 })}
+          multiple
+          selected={state.genres.length ? state.genres : [null]}
+          active={state.genres.length > 0}
+          onSelect={(genre) => onChange({ genres: genre === null ? [] : toggle(state.genres, genre), page: 1 })}
         />
         <Dropdown label="Nombre" options={NAME} selected={sortChoice} active={state.sort === 'title'} onSelect={sortBy} />
         <Dropdown
           label="País"
           options={countryOptions}
+          actions
           active={state.countries.length > 0}
           onSelect={(choice) =>
             choice === 'map'
@@ -88,14 +104,20 @@ export function BrowseBar({ state, genres, onChange }: BrowseBarProps) {
           }
         />
       </div>
-      <SearchBox value={state.q} onSearch={(q, replace) => onChange({ q, page: 1 }, replace)} />
+      <SearchBox
+        value={state.q}
+        // While typing, the first search adds an entry to the history, so the back button returns to the list
+        // from before; the next ones replace it, so the history doesn't fill up with every pause.
+        onSearch={(q, typing) => onChange({ q, page: 1 }, typing && state.q.trim() !== '')}
+      />
     </div>
   )
 }
 
 interface SearchBoxProps {
   value: string
-  onSearch: (q: string, replace: boolean) => void
+  /** `typing` is true when the search comes from a pause while typing, false for Enter. */
+  onSearch: (q: string, typing: boolean) => void
 }
 
 /** Searches 300 ms after the last key; Enter searches right away and Esc clears. */
@@ -105,8 +127,10 @@ function SearchBox({ value, onSearch }: SearchBoxProps) {
   // The last value this box sent: a different one in the URL comes from outside (back button, «Limpiar»).
   const sent = useRef(value)
 
+  // The URL keeps the text trimmed: "the " sent and "the" back is the same search, not a change from outside
+  // (comparing them as they are erased the space while the user paused between two words).
   useEffect(() => {
-    if (value !== sent.current) {
+    if (value.trim() !== sent.current.trim()) {
       sent.current = value
       setText(value)
     }

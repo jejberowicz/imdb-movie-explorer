@@ -11,14 +11,14 @@ amenaza concreta; las que serían sobreingeniería para este caso están en «Ri
 |---|---|---|
 | Inyección SQL | Consultas siempre parametrizadas. `ORDER BY` no se puede parametrizar, así que `sort` y `order` pasan por una lista blanca. Los comodines de `LIKE` se escapan | 1 a 3 |
 | Entradas abusivas: títulos enormes, `page_size` gigante | Validación con Pydantic: tipos, rangos y largos máximos. `title` acepta hasta 200 caracteres y `page_size` hasta 100 | 3 |
-| Una consulta inesperadamente cara | `statement_timeout` en el usuario de la API: ninguna consulta puede tomar el servidor por más de unos segundos | 5 |
+| Una consulta inesperadamente cara | `statement_timeout` por defecto en el usuario de la API: ninguna consulta puede tomar el servidor por más de unos segundos, y la API responde 503 | 5 |
 | Abuso por volumen: scraping o saturación | Límite de pedidos por IP con Flask-Limiter. Con el almacenamiento en memoria, el límite es por worker de Gunicorn; en producción iría en Redis. Queda documentado | 5 |
 | XSS con datos del CSV | Los datos se tratan como no confiables: React escapa todo por defecto y no se usa `dangerouslySetInnerHTML`. La política de seguridad de contenido (CSP) solo permite recursos del propio origen | 4 y 5 |
 | Clickjacking | `frame-ancestors 'none'` en la CSP: nadie puede embeber la app en un iframe | 5 |
-| Errores que revelan detalles internos | Los errores 500 devuelven un Problem Details genérico; el detalle queda en el log, nunca en la respuesta | 3 |
+| Errores que revelan detalles internos | Los errores 500 devuelven un Problem Details genérico; el detalle queda en el log, nunca en la respuesta. La base caída da 503 | 3 |
 | Secretos en el repo | Las credenciales llegan por variables de entorno. `.env` está en `.gitignore` y en el repo solo está `.env.example`, sin valores reales. Los logs no imprimen credenciales | 1 |
 | Escribir en la base desde la API | La API usa un usuario de la base con solo `SELECT`. Las migraciones y la carga usan otro. La base no se publica fuera de la red de Docker | 1 y 5 |
-| Contenedores vulnerables | Imágenes slim con versiones fijas, procesos sin root y healthchecks | 1 y 5 |
+| Contenedores vulnerables | Imágenes slim con versiones fijas, procesos sin root, sin capabilities, de solo lectura, con límites de memoria y de procesos, y healthchecks | 1 y 5 |
 | Dependencias con vulnerabilidades conocidas | Versiones fijadas; `pip-audit` y `npm audit` en CI | 5 |
 | Pedidos desde otros orígenes | En Docker, front y API quedan en el mismo origen a través del proxy, así que CORS no se habilita. Si hiciera falta, solo para el origen del front | 1 |
 | Headers de seguridad | CSP, `X-Content-Type-Options: nosniff` y `Referrer-Policy: strict-origin-when-cross-origin`, configurados en nginx | 5 |

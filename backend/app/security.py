@@ -13,6 +13,8 @@ HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
 }
+LOOPBACK = {"127.0.0.1", "::1"}
+UNMATCHED = "<no route>"
 # The JSON responses load nothing and can't be framed. Swagger UI (/docs) needs its own scripts, so it is left out.
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
 
@@ -27,15 +29,20 @@ def init_security(app: Flask, settings: Settings) -> None:
     limiter = Limiter(
         get_remote_address,
         app=app,
-        default_limits=[settings.rate_limit],
+        # One count per client for the whole API. default_limits would keep one per route: 300 a minute to each.
+        application_limits=[settings.rate_limit],
         storage_uri="memory://",
         headers_enabled=True,
+        # Flask-Limiter exempts a request without an endpoint, so 404s and 405s had no limit at all. They share
+        # one count per client instead, like any route.
+        request_identifier=lambda: request.endpoint or UNMATCHED,
     )
 
     @limiter.request_filter
-    def health_checks() -> bool:
-        # Docker asks every few seconds; a limit there could mark a healthy API as down.
-        return request.path.startswith("/health")
+    def docker_health_checks() -> bool:
+        # Docker asks every few seconds from inside the container; a limit there could mark a healthy API as down.
+        # Only that one is exempt: through nginx, /health/ready is public and queries the database.
+        return request.path.startswith("/health") and request.remote_addr in LOOPBACK
 
     @app.after_request
     def security_headers(response: Response) -> Response:

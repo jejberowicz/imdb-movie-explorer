@@ -76,7 +76,8 @@ backend/.venv/bin/python backend/scripts/measure_latency.py http://127.0.0.1:800
 
 - **gzip en nginx:** el script principal del front pasa de 373 KB a 118 KB, y las respuestas JSON también viajan
   comprimidas.
-- **Caché HTTP:** los archivos del build llevan un hash en el nombre y se cachean por un año; `index.html` se
-  revalida en cada visita. `/genres` y `/countries` se pueden cachear una hora (`Cache-Control`).
+- **Caché HTTP:** los archivos del build llevan un hash en el nombre y se cachean por un año (solo si existen:
+  un 404 no se cachea); `index.html` se revalida en cada visita. `/genres` y `/countries` se pueden cachear una
+  hora (`Cache-Control`).
 - **El mapa se descarga aparte**, solo en la página por país: el resto del sitio no paga sus 67 KB.
 

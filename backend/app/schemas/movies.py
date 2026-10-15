@@ -1,18 +1,44 @@
 """Request and response models. Pydantic validates the requests and the same models document the API."""
 
+import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_serializer, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
+from ..text import fold
+
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def no_control_characters(value: str) -> str:
+    """No title, genre or country has them, and PostgreSQL rejects a NUL: without this, «%00» would be a 500."""
+    if CONTROL_CHARACTERS.search(value):
+        raise ValueError("must not contain control characters")
+    return value
+
+
+Text = Annotated[str, AfterValidator(no_control_characters)]
 SortField = Literal["relevance", "rating", "year", "votes", "duration", "title"]
-CountryName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+CountryName = Annotated[Text, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+GenreName = Annotated[Text, StringConstraints(min_length=1, max_length=40)]
+Decade = Annotated[int, Field(ge=1880, le=2100, multiple_of=10)]
+Year = Annotated[int, Field(ge=1880, le=2100)]
 
 
 class MovieListQuery(BaseModel):
     # Unknown parameters are ignored (ADR 0007).
     model_config = ConfigDict(extra="ignore")
 
-    title: str | None = Field(
+    title: Text | None = Field(
         default=None,
         max_length=200,
         description="Text anywhere in the original or the Italian title, ignoring case and accents.",
@@ -23,11 +49,25 @@ class MovieListQuery(BaseModel):
         default=None, description="Default: relevance with a title, the weighted rating without one."
     )
     order: Literal["asc", "desc"] | None = Field(default=None, description="Default: asc for title, desc otherwise.")
-    genre: str | None = Field(default=None, min_length=1, max_length=40, description="A genre of GET /genres.")
+    genre: list[GenreName] = Field(
+        default_factory=list,
+        max_length=10,
+        description="A genre of GET /genres; repeat it to get the movies that have all of them.",
+    )
     country: list[CountryName] = Field(
         default_factory=list,
         max_length=20,
         description="A country of GET /countries; repeat it to get the movies of any of them.",
+    )
+    decade: list[Decade] = Field(
+        default_factory=list,
+        max_length=23,
+        description="The first year of a decade (1990 for the 1990s); repeat it to get the movies of any of them.",
+    )
+    year: list[Year] = Field(
+        default_factory=list,
+        max_length=50,
+        description="A year; repeat it to get the movies of any of them.",
     )
     year_from: int | None = Field(default=None, ge=1880, le=2100)
     year_to: int | None = Field(default=None, ge=1880, le=2100)
@@ -36,7 +76,9 @@ class MovieListQuery(BaseModel):
     @field_validator("title")
     @classmethod
     def blank_means_no_filter(cls, value: str | None) -> str | None:
-        return (value.strip() or None) if value is not None else None
+        # Blank once folded, as the search compares it: only spaces, or only accents with no letter («%CC%81»).
+        # Searching "" would match the whole catalog with the slowest query.
+        return value.strip() if value is not None and fold(value) else None
 
     @model_validator(mode="after")
     def consistent(self) -> "MovieListQuery":
@@ -62,6 +104,7 @@ class MovieSummary(BaseModel):
     year: int
     genres: list[str]
     directors: list[str] | None
+    countries: list[str] | None
     duration: int
     avg_vote: float
     votes: int
@@ -133,3 +176,12 @@ class CountryCount(BaseModel):
 
 class CountryList(BaseModel):
     items: list[CountryCount]
+
+
+class YearCount(BaseModel):
+    year: int
+    movies: int
+
+
+class YearList(BaseModel):
+    items: list[YearCount]

@@ -8,6 +8,9 @@ Las estimaciones son gruesas, en horas de trabajo, e incluyen los tests de cada 
 - **Nivel 2:** alto valor y costo bajo.
 - **Nivel 3:** solo si sobra tiempo y con OK explícito.
 
+**Estado al entregar (15/10):** las fases 1 a 6 están completas, con los niveles 1 y 2. Del nivel 3 está
+hecha la página por país con el mapa; lo demás queda en «Qué haría con más tiempo» del README.
+
 ### Fase 1: esqueleto que camina
 
 Al terminar esta fase, el proyecto ya cumple lo mínimo de la consigna.

@@ -15,6 +15,7 @@ SUMMARY_COLUMNS = (
     movies.c.year,
     movies.c.genres,
     movies.c.directors,
+    movies.c.countries,
     movies.c.duration,
     movies.c.avg_vote,
     movies.c.votes,
@@ -26,16 +27,19 @@ SORT_COLUMNS = {
     "year": movies.c.year,
     "votes": movies.c.votes,
     "duration": movies.c.duration,
-    # Folded title in byte order: the same A-Z everywhere, whatever the collation of the database.
-    "title": movies.c.original_title_search.collate("C"),
+    # Folded title without its leading symbols, in byte order: the same A-Z everywhere, whatever the collation of
+    # the database. The titles made only of symbols have no key and go last either way (nulls_last below).
+    "title": movies.c.title_sort.collate("C"),
 }
 
 
 @dataclass(frozen=True)
 class MovieFilters:
     title: str | None = None
-    genre: str | None = None
+    genres: tuple[str, ...] = ()
     countries: tuple[str, ...] = ()
+    decades: tuple[int, ...] = ()
+    years: tuple[int, ...] = ()
     year_from: int | None = None
     year_to: int | None = None
     min_votes: int | None = None
@@ -49,10 +53,16 @@ def _conditions(filters: MovieFilters) -> list[ColumnElement[bool]]:
     conditions: list[ColumnElement[bool]] = []
     if filters.title:
         conditions.append(_matches(f"%{like_escape(fold(filters.title))}%"))
-    if filters.genre:
-        conditions.append(movies.c.genres.contains([filters.genre]))
+    if filters.genres:
+        # All of them: Comedy and Romance are the romantic comedies.
+        conditions.append(movies.c.genres.contains(list(filters.genres)))
     if filters.countries:
         conditions.append(movies.c.countries.overlap(list(filters.countries)))
+    if filters.decades:
+        # Any of them: a movie has a single year.
+        conditions.append(or_(*(movies.c.year.between(decade, decade + 9) for decade in sorted(set(filters.decades)))))
+    if filters.years:
+        conditions.append(movies.c.year.in_(sorted(set(filters.years))))
     if filters.year_from is not None:
         conditions.append(movies.c.year >= filters.year_from)
     if filters.year_to is not None:
@@ -84,7 +94,7 @@ def find_movies(
         order = [relevance(filters.title).desc()]
     else:
         column = SORT_COLUMNS[sort]
-        order = [column.desc() if descending else column.asc()]
+        order = [(column.desc() if descending else column.asc()).nulls_last()]
     # The id breaks ties, so the pagination is stable: no movie shows up on two pages.
     order.append(movies.c.imdb_title_id.asc())
 
@@ -118,6 +128,12 @@ def genre_counts(conn: Connection) -> list[tuple[str, int]]:
 
 def country_counts(conn: Connection) -> list[tuple[str, int]]:
     return _item_counts(conn, movies.c.countries)
+
+
+def year_counts(conn: Connection) -> list[tuple[int, int]]:
+    count = func.count().label("movies")
+    stmt = select(movies.c.year, count).group_by(movies.c.year).order_by(movies.c.year)
+    return [(row.year, row.movies) for row in conn.execute(stmt)]
 
 
 def last_load_id(conn: Connection) -> int | None:

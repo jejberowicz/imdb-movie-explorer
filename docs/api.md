@@ -19,13 +19,15 @@ Devuelve una página de películas. Con `title`, filtra por título.
 
 | Parámetro | Tipo | Por defecto | Reglas |
 |---|---|---|---|
-| `title` | texto | — | Hasta 200 caracteres. Se recortan los espacios de los extremos y los repetidos. Vacío equivale a no filtrar |
+| `title` | texto | — | Hasta 200 caracteres. Se recortan los espacios de los extremos y los repetidos. Sin caracteres de control. Vacío, o sin ninguna letra una vez quitados los acentos (por ejemplo, una tilde suelta), equivale a no filtrar |
 | `page` | entero | 1 | 1 o más |
 | `page_size` | entero | 20 | Entre 1 y 100 |
 | `sort` | `relevance`, `rating`, `year`, `votes`, `duration`, `title` | `relevance` si hay `title`; si no, `rating` | `relevance` solo vale con `title`. `rating` es el rating ponderado |
 | `order` | `asc`, `desc` | `asc` para `title`; `desc` para el resto | `relevance` siempre es de mayor a menor |
-| `genre` | texto | — | Un género de `GET /genres`, en inglés, como en los datos; hasta 40 caracteres. Uno que no existe devuelve una lista vacía |
+| `genre` | texto, repetible | — | Un género de `GET /genres`, en inglés, como en los datos; hasta 40 caracteres y 10 valores. Con varios, devuelve las películas que tienen todos (`Comedy` y `Romance` son las comedias románticas). Uno que no existe devuelve una lista vacía |
 | `country` | texto, repetible | — | Un país de `GET /countries`, como en los datos; hasta 20 valores. Con varios, devuelve las películas de cualquiera de ellos |
+| `decade` | entero, repetible | — | El primer año de una década (1990 para los 1990s), entre 1880 y 2100; hasta 23 valores. Con varias, devuelve las películas de cualquiera de ellas. Se combina con `year_from` y `year_to` |
+| `year` | entero, repetible | — | Entre 1880 y 2100; hasta 50 valores. Con varios, devuelve las películas de cualquiera de ellos. Se combina con `decade`: la interfaz lo usa para los años elegidos de una década |
 | `year_from`, `year_to` | entero | — | Entre 1880 y 2100, con `year_from` menor o igual que `year_to` |
 | `min_votes` | entero | — | 0 o más |
 
@@ -36,6 +38,9 @@ Devuelve una página de películas. Con `title`, filtra por título.
 - **Relevancia:** combina la popularidad con qué tan bien coincide el título. Es el logaritmo de los votos, más
   2 si un título es igual al texto buscado y 1 si empieza con él. Así *The Godfather* (1,5 millones de votos)
   sale antes que una película llamada exactamente «Godfather» (2.839 votos).
+- **Orden alfabético:** compara el título original sin acentos ni mayúsculas y sin los símbolos del principio:
+  «#Alive» va con la A y «¡Three Amigos!» con la T, en lugar de ir todos antes de la A. Un título hecho solo de
+  símbolos, como «$», queda al final en los dos sentidos.
 - **Desempates:** todo orden termina en `imdb_title_id`, así la paginación es estable.
 - **Parámetros desconocidos:** se ignoran.
 
@@ -50,6 +55,7 @@ Devuelve una página de películas. Con `title`, filtra por título.
       "year": 1994,
       "genres": ["Drama"],
       "directors": ["Frank Darabont"],
+      "countries": ["USA"],
       "duration": 142,
       "avg_vote": 9.3,
       "votes": 2278845,
@@ -133,6 +139,17 @@ Se puede cachear, igual que `/genres`.
 
 El ejemplo está recortado: son 194 países.
 
+## `GET /years`
+
+Devuelve los años con películas, del más viejo al más nuevo, con la cantidad de cada uno. La interfaz arma con
+él las décadas del menú «Año» y la tira de años de una década. Se puede cachear, igual que `/genres`.
+
+```json
+{"items": [{"year": 1894, "movies": 1}, {"year": 1906, "movies": 1}, {"year": 2020, "movies": 789}]}
+```
+
+El ejemplo está recortado: son 112 años.
+
 ## `GET /health` y `GET /health/ready`
 
 - `/health` confirma que el proceso responde, sin tocar la base: `{"status": "ok"}`.
@@ -146,9 +163,10 @@ El ejemplo está recortado: son 194 países.
 |---|---|
 | 400 | Un parámetro inválido: `page=0`, `page_size=100000`, un `sort` fuera de la lista, un id con otro formato… |
 | 404 | El id tiene un formato válido, pero no existe |
-| 429 | Demasiados pedidos (Fase 5). Incluye `Retry-After` |
+| 405 | Un método que la ruta no acepta. Incluye `Allow`, con los que sí acepta |
+| 429 | Más de 300 pedidos por minuto desde una misma IP, sumando todas las rutas (configurable con `RATE_LIMIT`). Incluye `Retry-After`. A través de nginx hay además un límite más grueso, de 10 por segundo con ráfagas de 50, que responde lo mismo con `Retry-After: 1` |
 | 500 | Un error inesperado. El detalle queda en el log, nunca en la respuesta |
-| 503 | La base no responde o todavía no hay datos cargados |
+| 503 | La base no responde, una consulta pasó el `statement_timeout`, o todavía no hay datos cargados |
 
 `GET /movies?page_size=100000&sort=title;DROP TABLE movies`:
 
@@ -157,10 +175,10 @@ El ejemplo está recortado: son 194 países.
   "type": "about:blank",
   "title": "Bad Request",
   "status": 400,
-  "detail": "Invalid query parameters.",
+  "detail": "Invalid request parameters.",
   "errors": [
-    {"parameter": "page_size", "detail": "Must be between 1 and 100."},
-    {"parameter": "sort", "detail": "Must be one of: relevance, rating, year, votes, duration, title."}
+    {"parameter": "page_size", "detail": "Input should be less than or equal to 100"},
+    {"parameter": "sort", "detail": "Input should be 'relevance', 'rating', 'year', 'votes', 'duration' or 'title'"}
   ]
 }
 ```
@@ -178,6 +196,8 @@ curl "http://localhost:8000/movies"
 curl "http://localhost:8000/movies?title=relatos%20salvajes"
 curl "http://localhost:8000/movies?genre=Drama&year_from=1990&year_to=1999&sort=votes"
 curl "http://localhost:8000/movies/tt0068646"
+curl "http://localhost:8000/movies?genre=Comedy&genre=Romance&decade=1990&decade=2010"
+curl "http://localhost:8000/movies?decade=1990&year=1994&year=1997"
 curl "http://localhost:8000/genres"
 curl "http://localhost:8000/movies?country=Russia&country=Soviet%20Union"
 ```

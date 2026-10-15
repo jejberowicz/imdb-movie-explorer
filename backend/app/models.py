@@ -4,6 +4,7 @@ from sqlalchemy import (
     BigInteger,
     CheckConstraint,
     Column,
+    Computed,
     DateTime,
     Double,
     ForeignKey,
@@ -30,6 +31,12 @@ movies = Table(
     # Folded copies for the search: lowercase, without accents (app.text.fold)
     Column("original_title_search", Text, nullable=False),
     Column("italian_title_search", Text, nullable=False),
+    # The A-Z key: the folded original title without the symbols at its start; NULL if it has nothing else
+    Column(
+        "title_sort",
+        Text,
+        Computed(r"nullif(regexp_replace(original_title_search, '^[^[:alnum:]]+', ''), '')", persisted=True),
+    ),
     Column("year", SmallInteger, nullable=False),
     Column("genres", ARRAY(Text), nullable=False),
     Column("directors", ARRAY(Text)),

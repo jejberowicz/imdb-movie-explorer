@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { renderApp, searchOf } from '../test/render'
+import { findLegend, renderApp, searchOf } from '../test/render'
 
 const listNames = () =>
   screen
@@ -50,7 +50,7 @@ describe('countries page', () => {
 
     await user.click(screen.getByRole('link', { name: 'Unión Soviética' }))
 
-    expect(await screen.findByRole('heading', { name: 'Mejor valoradas · Drama · Unión Soviética' })).toBeInTheDocument()
+    expect(await findLegend('Hay 1 película del género Drama, hecha en Unión Soviética.')).toBeInTheDocument()
     expect(searchOf(router)).toEqual({ genre: ['Drama'], country: ['Soviet Union'] })
     expect(await screen.findByRole('link', { name: 'Stalker (1979)' })).toBeInTheDocument()
   })
@@ -65,7 +65,7 @@ describe('countries page', () => {
 
     fireEvent.click(russia)
     await waitFor(() => expect(searchOf(router)).toEqual({ country: ['Russia', 'Soviet Union'] }))
-    expect(await screen.findByRole('heading', { name: 'Mejor valoradas · Rusia y Unión Soviética' })).toBeInTheDocument()
+    expect(await findLegend('Hay 1 película hecha en Rusia o Unión Soviética.')).toBeInTheDocument()
   })
 
   it('draws the countries too small for the map as dots', async () => {

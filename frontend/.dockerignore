@@ -1,2 +1,5 @@
 node_modules
 dist
+# Never bake a local environment file into the image
+.env
+.env.*

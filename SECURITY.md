@@ -16,18 +16,19 @@ concreta. El plan con el que se diseñó está en [docs/security-plan.md](docs/s
 | Amenaza | Medida | Dónde |
 |---|---|---|
 | Inyección SQL | Consultas siempre parametrizadas con SQLAlchemy. `ORDER BY` no se puede parametrizar, así que `sort` y `order` pasan por una lista blanca. Los comodines `%` y `_` de `LIKE` se escapan. Un test manda `sort=title;DROP TABLE movies`: responde 400 y la tabla sigue ahí | `repositories/movies.py`, `test_acceptance.py` |
-| Entradas abusivas | Pydantic valida tipos, rangos y largos: `title` hasta 200 caracteres, `page_size` hasta 100, hasta 20 países. Lo inválido responde 400 con el parámetro y el motivo | `schemas/movies.py` |
-| Escribir en la base desde la API | La API se conecta con `movies_api`, que solo tiene `SELECT` y cuyas transacciones son de solo lectura. Las migraciones y la carga usan otro usuario | `db/init/01-api-reader.sh` |
-| Una consulta cara que acapare la base | `statement_timeout` de 5 s en el usuario de la API. El pedido real más lento tarda unos 60 ms de punta a punta ([docs/performance.md](docs/performance.md)) | `db/init/01-api-reader.sh` |
-| Abuso por volumen | 300 pedidos por minuto por IP con Flask-Limiter, y 429 con `Retry-After` al pasarse. Detrás de nginx, la IP sale de `X-Forwarded-For`, que nginx reescribe; sin proxy, ese header se ignora | `app/security.py` |
+| Entradas abusivas | Pydantic valida tipos, rangos y largos: `title` hasta 200 caracteres, `page_size` hasta 100, hasta 20 países. Los textos no aceptan caracteres de control, y un título que queda vacío sin sus acentos no filtra. Lo inválido responde 400 con el parámetro y el motivo; el front acota los valores de una URL compartida a esos mismos rangos | `schemas/movies.py`, `lib/browse.ts` |
+| Escribir en la base desde la API | La API se conecta con `movies_api`, que solo tiene `SELECT` sobre las dos tablas que usa (`movies` y `load_runs`): no puede escribir, ni crear tablas temporales, ni conectarse a otras bases. Esos permisos son la barrera; que sus transacciones sean de solo lectura es un valor por defecto que suma, pero que la sesión podría cambiar. Las migraciones y la carga usan el dueño, `movies`, que no es superusuario, y el superusuario no puede entrar por la red: ni con código en la API se llega a ejecutar comandos en el servidor de la base | `db/init/01-roles.sh`, `migrations/versions/0004_api_grants.py` |
+| Una consulta cara que acapare la base | `statement_timeout` de 5 s por defecto en el usuario de la API; la API responde 503 si se corta. El pedido real más lento tarda unos 60 ms de punta a punta ([docs/performance.md](docs/performance.md)) | `db/init/01-roles.sh` |
+| Abuso por volumen | 300 pedidos por minuto por IP con Flask-Limiter, sumando todas las rutas, los 404 y los 405, y 429 con `Retry-After` al pasarse. Un `RATE_LIMIT` inválido no deja arrancar la API. Delante, nginx pone un límite más grueso a todo `/api/`: 10 pedidos por segundo con ráfagas de 50 y 20 conexiones a la vez por IP. Detrás de nginx, la IP sale de `X-Forwarded-For`, que nginx reescribe; sin proxy, ese header se ignora. Solo el healthcheck de Docker, desde adentro del contenedor, queda exento | `app/security.py`, `frontend/nginx/default.conf` |
 | XSS con datos del CSV | Los datos se tratan como no confiables: React escapa todo y no hay `dangerouslySetInnerHTML`, `innerHTML` ni `eval`. Además, la CSP solo permite scripts del propio origen, sin `unsafe-inline` | `frontend/nginx/security-headers.conf` |
 | Clickjacking | `frame-ancestors 'none'` en la CSP del sitio y de la API, y `X-Frame-Options: DENY` en la API | nginx y `app/security.py` |
-| Errores que revelan detalles internos | Todo error sale como Problem Details (RFC 9457). Un 500 dice «Unexpected error.»; el detalle queda solo en el log | `app/errors.py` |
+| Errores que revelan detalles internos | Todo error sale como Problem Details (RFC 9457). Un 500 dice «Unexpected error.»; el detalle queda solo en el log. Si la base no responde, es un 503 con una línea de log, sin un stack trace por pedido | `app/errors.py` |
 | Secretos en el repo | Las contraseñas llegan por variables de entorno. `.env` está en `.gitignore` y en el repo solo hay `.env.example`, sin valores reales. Ningún log imprime la URL de la base | `.env.example` |
-| Superficie expuesta | La base no se publica fuera de la red de Docker. La API se publica solo en `127.0.0.1`: el navegador entra por nginx, en el mismo origen, así que CORS no está habilitado | `docker-compose.yml` |
-| Contenedores | Imágenes slim con versiones fijas, procesos sin root (la API corre con el uid 10001; nginx es la imagen sin privilegios) y healthchecks | `Dockerfile` |
-| Dependencias vulnerables | Versiones fijadas (pip freeze y `package-lock.json`). `pip-audit` y `npm audit` corren en cada push | `.github/workflows/ci.yml` |
+| Superficie expuesta | La base no se publica y está en una red interna de Docker que solo comparte con la carga y la API: nginx no llega a ella. La API se publica solo en `127.0.0.1`: el navegador entra por nginx, en el mismo origen, así que CORS no está habilitado. Swagger UI no se sirve a través de nginx | `docker-compose.yml`, `frontend/nginx/default.conf` |
+| Contenedores | Imágenes slim con versiones fijas y procesos sin root (la API corre con el uid 10001; nginx es la imagen sin privilegios). Sin capabilities (la base conserva las 5 que necesita su arranque), `no-new-privileges`, sistema de archivos de solo lectura, límites de memoria y de procesos, reinicio automático y healthchecks | `docker-compose.yml`, `Dockerfile` |
+| Dependencias vulnerables | Versiones fijadas (pip freeze y `package-lock.json`). `pip-audit` y `npm audit` corren en cada push. `npm ci --ignore-scripts`: ninguna dependencia puede correr código al instalarse | `.github/workflows/ci.yml` |
 | Cadena de suministro del CI | Las GitHub Actions están fijadas a un commit, no a un tag que se pueda mover, y el workflow solo puede leer el repo | `.github/workflows/ci.yml` |
+| Un CSV roto o malicioso | La carga rechaza fila por fila lo que no puede leer, con su motivo: comas de más o de menos, saltos de línea dentro de un campo (la señal de una comilla sin cerrar, que se traga las filas siguientes), campos de más de 2.000 caracteres, números enormes. Cada línea tragada cuenta para el umbral del 1 %. Saca los caracteres invisibles y de control, como el que muestra un título al revés. Un archivo que no es UTF-8 o no se puede leer como CSV corta la carga sin escribir nada | `app/etl/` |
 | Links externos | El link a IMDb lleva `rel="noopener noreferrer"`: la pestaña nueva no puede controlar la nuestra | `MoviePage.tsx` |
 | Otros headers | `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` y nginx sin su versión en las respuestas | nginx y `app/security.py` |
 
@@ -36,14 +37,81 @@ concreta. El plan con el que se diseñó está en [docs/security-plan.md](docs/s
 - **No hay autenticación.** No hay datos privados ni escrituras que proteger detrás de un login: agregarlo
   sumaría superficie de ataque sin ningún beneficio.
 - **El límite de pedidos es por worker.** El contador vive en la memoria de cada worker de Gunicorn, así que
-  con 2 workers el límite real es el doble. Para una sola máquina alcanza; con varias, iría en Redis.
+  con 2 workers el límite real es el doble. Para una sola máquina alcanza; con varias, iría en Redis. El de
+  nginx sí es uno solo.
 - **Sin TLS en local.** En un despliegue real, TLS se termina en el proxy reverso, con HSTS.
 - **Swagger UI no lleva CSP**, porque necesita sus propios scripts. Se sirve solo en el puerto de la API, que
   está publicado en `127.0.0.1`.
 - **Las contraseñas por defecto de `docker-compose.yml`** sirven solo para una base local que no se publica
   fuera de Docker. En cualquier otro entorno se cambian con `.env`.
+- **La contraseña del dueño tiene un valor por defecto.** Quien lograra ejecutar código en la API y la
+  conociera podría modificar el catálogo (no ejecutar comandos: el dueño no es superusuario). Fuera de una
+  máquina local, las contraseñas se cambian con `.env`.
+- **El puerto directo de la API confía en `X-Forwarded-For`**, porque en Docker siempre hay un nginx adelante.
+  Alguien en esta misma máquina podría inventarse una IP para esquivar el límite; desde afuera no se llega a
+  ese puerto.
+- **Las imágenes se fijan por versión, no por digest**, y pip instala sin verificar hashes. Fijar digests y
+  usar `--require-hashes` cerraría la cadena de suministro del todo, a cambio de más mantenimiento.
+- **El usuario de la API puede llamar funciones de PostgreSQL** como `pg_sleep`, y cambiar su propio
+  `statement_timeout`. Solo serviría combinado con una inyección SQL, que la API no tiene: todas las consultas
+  son parametrizadas.
+- **gzip con respuestas que repiten lo que manda el usuario** es la condición de BREACH, pero ese ataque busca
+  secretos en la misma respuesta (tokens, cookies), y acá no hay ninguno.
 - **Datos de IMDb en un repo público.** Se incluyen solo para correr el desafío, sin fines comerciales
   ([ADR 0006](docs/decisions/0006-csv-versioning.md)).
+
+## Revisión de seguridad
+
+Al terminar, revisé todo el proyecto con el código delante, capa por capa: el SQL, la validación, los
+errores, los headers, el límite de pedidos, los usuarios de la base, Docker, el CI, las dependencias y el
+historial de git. Probé la API corriendo con entradas hostiles: inyección en `sort`, comodines, textos y
+listas de más, años cruzados, páginas enormes, métodos no permitidos, URLs de 9.000 caracteres y caracteres
+de control.
+
+Encontré y corregí tres cosas, cada una con su test:
+
+1. **Un byte NUL (`%00`) en la búsqueda daba 500.** PostgreSQL lo rechaza, y cada pedido dejaba un stack trace
+   en el log. Ahora es un 400.
+2. **`/health/ready` estaba exento del límite para cualquiera.** A través de nginx es público y consulta la
+   base. Ahora solo queda exento el healthcheck de Docker.
+3. **Cadena de suministro y secretos:** el build del front ya no corre scripts de instalación, y ningún `.env`
+   puede terminar dentro de una imagen.
+
+Sin hallazgos en el resto:
+- ni secretos ni contraseñas reales en el repo ni en el historial;
+- `pip-audit` y `npm audit` sin vulnerabilidades conocidas;
+- ningún `innerHTML` ni `eval` en el front;
+- la CSP no se viola en ninguna pantalla, revisada con Playwright.
+
+### Segunda revisión
+
+Después hice una segunda revisión, más a fondo, en tres frentes por separado (backend, front con nginx, e
+infraestructura con el CI y el historial), probando cada hallazgo contra el stack. No apareció nada grave:
+ni inyección SQL ni XSS. Corregí todo lo que encontró, con un test por cada cosa:
+
+- **Base de datos:**
+  - el dueño de las tablas era superusuario, y la API llegaba a él con la contraseña por defecto;
+  - el usuario de la API podía crear tablas temporales y leer tablas que no usa;
+  - nginx llegaba a la base.
+- **Carga:**
+  - una recarga bloqueaba a la API por el `TRUNCATE`;
+  - una fila rara (un NUL, un número de miles de dígitos) tiraba abajo toda la carga;
+  - una comilla sin cerrar perdía filas en silencio.
+- **API:**
+  - el límite de pedidos contaba cada ruta por separado y no contaba los 404 ni los 405;
+  - un `RATE_LIMIT` mal escrito daba 500 en cada pedido;
+  - la base caída daba 500 en vez de 503;
+  - los 405 no decían qué métodos acepta la ruta.
+- **nginx:**
+  - Swagger UI quedaba publicado, sin CSP;
+  - un 404 de `/assets/` se cacheaba por un año;
+  - `/api` redirigía al puerto interno.
+- **Front:**
+  - un género llamado `constructor` rompía la grilla;
+  - una pausa entre dos palabras borraba el espacio;
+  - una búsqueda escrita no se deshacía con el botón atrás;
+  - una URL con valores fuera de rango dejaba un error sin salida.
+- **Contenedores:** corrían con capabilities, con el sistema de archivos escribible y sin límites.
 
 ## Qué cambiaría con datos médicos reales
 

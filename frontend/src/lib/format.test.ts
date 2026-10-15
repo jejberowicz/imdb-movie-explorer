@@ -13,6 +13,9 @@ describe('es-AR formats', () => {
 
   it('abbreviates the votes of the cards', () => {
     expect(plain(formatCompact(2278845))).toBe('2,3 M')
+    expect(plain(formatCompact(350500))).toBe('350,5 k')
+    expect(plain(formatCompact(3000))).toBe('3 k')
+    expect(plain(formatCompact(999999))).toBe('1 M')
     expect(formatCompact(681)).toBe('681')
   })
 

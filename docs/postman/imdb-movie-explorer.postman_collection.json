@@ -223,6 +223,92 @@
           }
         },
         {
+          "name": "Géneros y décadas repetibles: comedias románticas de los 90 y los 2010",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?genre=Comedy&genre=Romance&decade=1990&decade=2010",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "genre",
+                  "value": "Comedy"
+                },
+                {
+                  "key": "genre",
+                  "value": "Romance"
+                },
+                {
+                  "key": "decade",
+                  "value": "1990"
+                },
+                {
+                  "key": "decade",
+                  "value": "2010"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Años repetibles: las películas de 1994 y 1997",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/movies?decade=1990&year=1994&year=1997",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "movies"
+              ],
+              "query": [
+                {
+                  "key": "decade",
+                  "value": "1990"
+                },
+                {
+                  "key": "year",
+                  "value": "1994"
+                },
+                {
+                  "key": "year",
+                  "value": "1997"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Paginación",
           "event": [
             {
@@ -342,6 +428,33 @@
               ],
               "path": [
                 "countries"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Años",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"responde 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "description": "",
+            "url": {
+              "raw": "{{baseUrl}}/years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "years"
               ]
             }
           }

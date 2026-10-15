@@ -9,22 +9,42 @@ export interface Option<T> {
 interface DropdownProps<T> {
   label: string
   options: Option<T>[]
-  selected?: T
+  /** The chosen value, or the chosen values of a menu with `multiple`. */
+  selected?: T | T[]
   active?: boolean
+  /** The options are commands (open the map), not a choice among values: plain menu items, none checked. */
+  actions?: boolean
+  /** Several can be chosen: the menu stays open after each one, until Esc or a click outside. */
+  multiple?: boolean
   onSelect: (value: T) => void
 }
 
-/** A menu button: arrows move between the options, Enter chooses, Esc closes and returns the focus. */
-export function Dropdown<T>({ label, options, selected, active = false, onSelect }: DropdownProps<T>) {
+const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]'
+
+/**
+ * A menu button: arrows move between the options, Enter chooses, Esc closes and returns the focus. Choosing what
+ * is already chosen is up to the caller: the menus of the browse bar take it as unchoosing it.
+ */
+export function Dropdown<T>({
+  label,
+  options,
+  selected,
+  active = false,
+  actions = false,
+  multiple = false,
+  onSelect,
+}: DropdownProps<T>) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const id = useId()
+  const checked = (value: T) => (Array.isArray(selected) ? selected.includes(value) : value === selected)
+  const role = actions ? 'menuitem' : multiple ? 'menuitemcheckbox' : 'menuitemradio'
 
   useEffect(() => {
     if (!open) return
-    const items = menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')
+    const items = menu.current?.querySelectorAll<HTMLButtonElement>(ITEMS)
     const current = Array.from(items ?? []).find((item) => item.getAttribute('aria-checked') === 'true')
     ;(current ?? items?.[0])?.focus()
     const closeOutside = (event: MouseEvent) => {
@@ -40,7 +60,7 @@ export function Dropdown<T>({ label, options, selected, active = false, onSelect
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const items = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [])
+    const items = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>(ITEMS) ?? [])
     const index = items.indexOf(document.activeElement as HTMLButtonElement)
     const moves: Record<string, number> = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 }
     if (event.key in moves) {
@@ -72,16 +92,18 @@ export function Dropdown<T>({ label, options, selected, active = false, onSelect
       </button>
       {open && (
         <div ref={menu} id={id} role="menu" aria-label={label} className={styles.menu} onKeyDown={onKeyDown}>
+          {/* The value as key, unique in each menu: two options may share a label, and the genres can arrive from
+              the API while the menu is open, which must not move the focus. */}
           {options.map((option) => (
             <button
-              key={option.label}
+              key={String(option.value)}
               type="button"
-              role="menuitemradio"
-              aria-checked={option.value === selected}
+              role={role}
+              aria-checked={actions ? undefined : checked(option.value)}
               className={styles.item}
               onClick={() => {
                 onSelect(option.value)
-                close()
+                if (!multiple) close()
               }}
             >
               {option.label}

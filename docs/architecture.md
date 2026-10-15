@@ -23,7 +23,8 @@ flowchart LR
   quedan en el mismo origen, así que CORS no hace falta.
 - **La API también se publica en `http://localhost:8000`**, para probarla con `curl` o Postman, como pide la
   consigna.
-- **La base no se publica fuera de la red de Docker.**
+- **La base no se publica**, y está en una red interna de Docker (`backend`) que solo comparten la carga y la
+  API. nginx está en otra (`frontend`), con la API: no llega a la base.
 
 ### Orden de arranque
 
@@ -31,7 +32,7 @@ flowchart LR
 
 | Servicio | Qué hace | Listo cuando |
 |---|---|---|
-| `db` | PostgreSQL 18 | `pg_isready` responde |
+| `db` | PostgreSQL 18 | `pg_isready` responde por TCP: el socket local ya contesta mientras la base se inicializa |
 | `seed` | Aplica las migraciones y carga el CSV. Si ese mismo archivo ya está cargado, según su SHA-256, termina sin hacer nada | Termina con código 0 |
 | `api` | Gunicorn con la app de Flask | `GET /health/ready` responde 200 |
 | `web` | nginx con la app compilada | Responde en el puerto 8080 |
@@ -59,32 +60,44 @@ flowchart TB
 - **La carga (`flask seed`) vive en el mismo paquete** que la API, con sus funciones de parseo puras y
   testeadas por separado.
 
-Estructura de carpetas propuesta:
+Estructura de carpetas:
 
 ```text
 backend/
   app/
     __init__.py         create_app()
     config.py           configuración desde variables de entorno
-    api/                blueprints: movies, genres, health
-    services/
-    repositories/
+    security.py         límite de pedidos por IP y headers de seguridad
+    api/                blueprints: movies, catalog (géneros y países), health
+    services/           casos de uso: paginación, orden por defecto, catálogo por carga
+    repositories/       SQL parametrizado
     schemas/            modelos de Pydantic (parámetros y respuestas)
     errors.py           Problem Details
     countries.py        nombre del país en el CSV → código ISO donde se pinta en el mapa
     text.py             plegado del texto, el mismo para la carga y para la búsqueda
     etl/                parseo, reglas del ADR 0003 y comando seed
-  migrations/           Alembic
-  tests/                unit/, integration/ y fixtures/ (CSV chico con los casos borde)
-  pyproject.toml
+  migrations/           Alembic; la 0004 da a la API permiso de lectura sobre sus dos tablas, y la 0005
+                        agrega la clave del orden alfabético
+  scripts/              EXPLAIN de las consultas y medición de p50 y p95
+  tests/                parseo, carga, API, seguridad, criterios de aceptación y fixtures/ (CSV chicos)
   Dockerfile
 frontend/
-  src/                  api/, components/, features/movies/, routes/, styles/
-  nginx.conf
+  src/
+    api/                cliente HTTP y tipos de la API
+    components/         barra «Explorar por», menús, grilla, tabla, póster, estados, marco de la página
+    features/countries/ el mapa: formas de Natural Earth, proyección y componente
+    hooks/              catálogo, vista elegida, media queries, título de la pestaña
+    lib/                estado en la URL, formatos es-AR, géneros, países, pósters
+    pages/              explorar, detalle, por país, 404 y error
+    styles/             paleta y estilos globales
+    test/               MSW con los datos de prueba y helpers
+  nginx/                configuración y headers de seguridad
   Dockerfile
+db/init/                crea el usuario de solo lectura de la API
+scripts/                perfilado del CSV, benchmark de almacenamiento y armado del mapa
 data/IMDb_movies.csv.gz
 docker-compose.yml
-.env.example
+.github/workflows/      CI
 ```
 
 ## Frontend
@@ -96,7 +109,7 @@ React con TypeScript y Vite.
   - cancela los pedidos viejos, así una respuesta lenta no pisa a una nueva;
   - mantiene los resultados anteriores mientras llegan los nuevos, sin parpadeo;
   - cachea cada combinación de parámetros.
-- **El estado vive en la URL** (`?q=&page=&genre=&sort=`), con React Router. Se puede compartir, recargar y
+- **El estado vive en la URL** (`?q=&page=&genre=&decade=&sort=`), con React Router. Se puede compartir, recargar y
   usar el botón atrás.
 - **Tres rutas:**
   - `/` explora y busca;
@@ -106,6 +119,10 @@ React con TypeScript y Vite.
   ([ADR 0010](decisions/0010-generated-posters.md)).
 - **El mapa usa d3-geo** para proyectar la geometría de Natural Earth. Se carga solo al abrir esa página, para
   no sumar peso a la principal.
+- **React Router en modo datos** (`createBrowserRouter`): da la restauración del scroll al volver de un
+  detalle, la carga diferida de la página por país y una página de error si algo falla al mostrar una ruta.
+- **Al cambiar de página, el foco pasa al contenido**, para que un lector de pantalla empiece a leer ahí. Al
+  escribir en la búsqueda no se mueve, porque solo cambia la query string.
 
 ## Modelo de datos
 
@@ -117,6 +134,7 @@ React con TypeScript y Vite.
 | `original_title` | `text` | `NOT NULL`. Es el título que se muestra |
 | `italian_title` | `text` | `NOT NULL`. Es la columna `title` del CSV |
 | `original_title_search`, `italian_title_search` | `text` | `NOT NULL`. Los títulos plegados: minúsculas, sin acentos y con ø, æ, ð y þ convertidas |
+| `title_sort` | `text` | Columna generada: `original_title_search` sin los símbolos del principio, la clave del orden alfabético. `NULL` si el título es solo símbolos, y esos van al final |
 | `year` | `smallint` | `NOT NULL`, `CHECK` entre 1880 y 2100. El límite del año actual lo aplica la carga (regla 1): un `CHECK` no puede depender de la fecha |
 | `genres` | `text[]` | `NOT NULL`, al menos uno. El CSV trae hasta 3, pero un `CHECK` con máximo rechazaría una película válida si un CSV futuro trajera más |
 | `duration` | `smallint` | `NOT NULL`, minutos, `CHECK > 0` |
@@ -141,11 +159,11 @@ fuente.
 | Clave primaria (`imdb_title_id`) | El detalle de una película |
 | GIN con `gin_trgm_ops` en las dos columnas `*_search` | La búsqueda con `LIKE '%…%'` ([ADR 0005](decisions/0005-data-storage.md)) |
 | B-tree en `(weighted_rating DESC, imdb_title_id)` | La lista por defecto, sin ordenar en cada request |
-| GIN en `genres` | El filtro por género (`genres @> ARRAY['Drama']`) |
+| GIN en `genres` | El filtro por género, que con varios pide todos (`genres @> ARRAY['Comedy', 'Romance']`) |
 | GIN en `countries` | El filtro por país, que acepta varios a la vez (`countries && ARRAY['Russia', 'Soviet Union']`) |
 
-Los índices para los otros órdenes (año, votos, duración, título) se agregan en la Fase 2 solo si
-`EXPLAIN ANALYZE` muestra que hacen falta. Con 85.855 filas, ordenar en memoria puede alcanzar.
+Los otros órdenes (año, votos, duración, título) no tienen índice: con 85.855 filas, ordenar en memoria tarda
+unos milisegundos, y `EXPLAIN ANALYZE` no mostró que hiciera falta ([performance.md](performance.md)).
 
 ### Qué se normaliza y qué no
 
@@ -172,16 +190,26 @@ Los índices para los otros órdenes (año, votos, duración, título) se agrega
 
 1. Calcula el SHA-256 del archivo. Si coincide con el de la última carga exitosa, termina.
 2. Lee el `.gz` como texto y aplica a cada fila las reglas del [ADR 0003](decisions/0003-data-cleaning-rules.md).
-   Una fila que no se puede interpretar va a `load_rejections` con su motivo; las demás siguen.
+   Una fila que no se puede interpretar va a `load_rejections` con su motivo; las demás siguen. Eso incluye las
+   filas rotas: comas de más o de menos, un salto de línea dentro de un campo (una comilla sin cerrar, que se
+   traga las filas siguientes: cada línea tragada cuenta como rechazada) y campos de más de 2.000 caracteres.
+   Un archivo que no es UTF-8 o que no se puede leer como CSV corta la carga sin escribir nada.
 3. Calcula C y m, y el rating ponderado de cada película.
-4. En una sola transacción, vacía `movies`, la llena con `COPY` y registra la corrida en `load_runs`. Mientras
-   tanto, la API sigue viendo los datos anteriores.
+4. En una sola transacción, borra las películas con `DELETE`, carga las nuevas con `COPY` y registra la corrida en
+   `load_runs`. Mientras tanto, la API sigue viendo los datos anteriores: `DELETE`, a diferencia de `TRUNCATE`,
+   no bloquea las lecturas. Al terminar, `VACUUM` libera las filas borradas, sin el paso final que sí
+   bloquearía, y `ANALYZE` actualiza las estadísticas.
 5. Si los rechazos superan el 1 % de las filas, la transacción se cancela y el seed falla con el resumen. Con el
    CSV actual se espera 0.
 
 ### Usuarios de la base
 
-- **El dueño** (migraciones y seed) crea tablas y escribe.
-- **El de la API** solo puede leer (`SELECT`) y tiene `statement_timeout`, para cortar cualquier consulta
-  inesperadamente cara.
+- **El superusuario** solo administra, desde adentro del contenedor: por la red no puede entrar.
+- **El dueño, `movies`,** (migraciones y seed) crea tablas y escribe, pero no es superusuario: con su
+  contraseña no se pueden correr comandos en el servidor.
+- **El de la API, `movies_api`,** solo tiene `SELECT` sobre `movies` y `load_runs`, las dos tablas que usa: no
+  puede escribir, crear tablas temporales ni conectarse a otras bases. Lo crea `db/init/01-roles.sh` cuando se
+  crea la base, y la migración 0004 le da esos permisos. Además, por defecto sus transacciones son de solo
+  lectura y tiene un `statement_timeout` de 5 s; son valores que la sesión podría cambiar, así que la barrera
+  real son los permisos.
 - Las credenciales llegan por variables de entorno. En el repo solo está `.env.example`, sin valores reales.

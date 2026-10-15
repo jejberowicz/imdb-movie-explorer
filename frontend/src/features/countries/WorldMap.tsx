@@ -1,4 +1,4 @@
-import { type MouseEvent, useRef, useState } from 'react'
+import { type MouseEvent, useMemo, useRef, useState } from 'react'
 import { countryLabel, type Region } from '../../lib/countries'
 import { countMovies, formatNumber } from '../../lib/format'
 import { DOTS, HEIGHT, SHAPES, STEPS, stepOf, WIDTH } from './geometry'
@@ -8,6 +8,9 @@ interface WorldMapProps {
   regions: Map<string, Region>
   onSelect: (region: Region) => void
 }
+
+/** Pixels the mouse moves over the same country before the tooltip follows it. */
+const MIN_MOVE = 2
 
 interface Hover {
   region: Region
@@ -37,25 +40,17 @@ export function WorldMap({ regions, onSelect }: WorldMapProps) {
       return
     }
     const x = event.clientX - rect.left
-    setHover({ region, x, y: event.clientY - rect.top, flip: x > rect.width * 0.6 })
+    const y = event.clientY - rect.top
+    // The same country and less than a few pixels: no new state, so React doesn't render again.
+    if (hover?.region === region && Math.abs(hover.x - x) < MIN_MOVE && Math.abs(hover.y - y) < MIN_MOVE) return
+    setHover({ region, x, y, flip: x > rect.width * 0.6 })
   }
 
-  const highlighted = hover && SHAPES.find((shape) => shape.code === hover.region.code)
-  const highlightedDot = hover && DOTS.find((dot) => dot.code === hover.region.code)
-
-  return (
-    <figure className={styles.map} ref={box}>
-      <svg
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        role="img"
-        aria-label="Mapa del mundo con un tono por país según su cantidad de películas. La lista de abajo tiene los mismos datos."
-        onMouseMove={onMove}
-        onMouseLeave={() => setHover(null)}
-        onClick={(event) => {
-          const region = regionAt(event)
-          if (region) onSelect(region)
-        }}
-      >
+  // About 170 paths and their dots only change with the data, not with the mouse: the same elements let React
+  // skip them on every move, and only the highlight and the tooltip render again.
+  const layer = useMemo(
+    () => (
+      <>
         {SHAPES.map((shape, index) => {
           const region = regions.get(shape.code)
           return (
@@ -84,6 +79,28 @@ export function WorldMap({ regions, onSelect }: WorldMapProps) {
             )
           )
         })}
+      </>
+    ),
+    [regions],
+  )
+
+  const highlighted = hover && SHAPES.find((shape) => shape.code === hover.region.code)
+  const highlightedDot = hover && DOTS.find((dot) => dot.code === hover.region.code)
+
+  return (
+    <figure className={styles.map} ref={box}>
+      <svg
+        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+        role="img"
+        aria-label="Mapa del mundo con un tono por país según su cantidad de películas. La lista de abajo tiene los mismos datos."
+        onMouseMove={onMove}
+        onMouseLeave={() => setHover(null)}
+        onClick={(event) => {
+          const region = regionAt(event)
+          if (region) onSelect(region)
+        }}
+      >
+        {layer}
         {highlighted && <path d={highlighted.d} className={styles.highlight} />}
         {highlightedDot && <circle cx={highlightedDot.x} cy={highlightedDot.y} r={3.5} className={styles.highlight} />}
       </svg>

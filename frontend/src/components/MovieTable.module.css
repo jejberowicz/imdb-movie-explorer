@@ -8,6 +8,14 @@
   font-size: 14px;
 }
 
+.note {
+  margin: 0 0 8px;
+  padding: 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
 .table th {
   padding: 8px;
   border-bottom: 1px solid var(--line);
@@ -17,6 +25,7 @@
   letter-spacing: 0.08em;
   text-align: left;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .table td {

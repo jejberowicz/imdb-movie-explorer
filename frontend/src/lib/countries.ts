@@ -34,7 +34,7 @@ export function regionName(code: string): string {
 
 /** The Spanish name of a country of the CSV. */
 export function countryLabel(country: Pick<CountryCount, 'name' | 'map_code' | 'former'>): string {
-  if (country.former) return FORMER_ES[country.name] ?? country.name
+  if (country.former) return Object.hasOwn(FORMER_ES, country.name) ? FORMER_ES[country.name] : country.name
   return country.map_code ? regionName(country.map_code) : country.name
 }
 

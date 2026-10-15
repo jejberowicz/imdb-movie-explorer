@@ -24,13 +24,18 @@ export function EmptyState({ query, onClear }: { query?: string; onClear?: () =>
   )
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({ message, onRetry, onClear }: { message: string; onRetry?: () => void; onClear?: () => void }) {
   return (
     <div className={styles.message} role="alert">
       <p>{message}</p>
       {onRetry && (
         <button type="button" className="button" onClick={onRetry}>
           Reintentar
+        </button>
+      )}
+      {onClear && (
+        <button type="button" className="button" onClick={onClear}>
+          Limpiar filtros
         </button>
       )}
     </div>

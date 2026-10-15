@@ -20,14 +20,18 @@ from ..schemas.movies import (
     MovieListQuery,
     MoviePage,
     MovieSummary,
+    YearCount,
+    YearList,
 )
 
 
 def list_movies(query: MovieListQuery) -> MoviePage:
     filters = MovieFilters(
         title=query.title,
-        genre=query.genre,
+        genres=tuple(query.genre),
         countries=tuple(query.country),
+        decades=tuple(query.decade),
+        years=tuple(query.year),
         year_from=query.year_from,
         year_to=query.year_to,
         min_votes=query.min_votes,
@@ -69,8 +73,8 @@ def get_movie(imdb_title_id: str) -> MovieDetail | None:
 
 
 def _per_load[T](name: str, compute: Callable[[Connection], T]) -> T:
-    """The result of `compute`, kept until the next load: genres and countries only change with new data, and
-    counting them takes ~40 ms over the 85.855 movies, while asking for the last load takes a fraction of 1 ms."""
+    """The result of `compute`, kept until the next load: genres, countries and years only change with new data,
+    and counting them takes ~40 ms over the 85.855 movies, while asking for the last load takes a fraction of 1 ms."""
     cache: dict[str, tuple[int, Any]] = current_app.extensions.setdefault("per_load_cache", {})
     with get_engine().connect() as conn:
         load_id = repository.last_load_id(conn)
@@ -96,6 +100,11 @@ def list_countries() -> CountryList:
             for name, count in counts
         ]
     )
+
+
+def list_years() -> YearList:
+    counts = _per_load("years", repository.year_counts)
+    return YearList(items=[YearCount(year=year, movies=count) for year, count in counts])
 
 
 def loaded_movies() -> int:

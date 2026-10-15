@@ -15,13 +15,15 @@ import styles from './MoviePage.module.css'
 export default function MoviePage() {
   const { id = '' } = useParams()
   const movie = useQuery({ queryKey: ['movie', id], queryFn: ({ signal }) => fetchMovie(id, signal), retry: false })
-  // The Spanish names of the countries come from /countries: waiting for it avoids a flash of «USA». It is
-  // usually cached already; if it fails, the names stay as in the CSV.
+  // The Spanish names of the countries come from /countries: waiting for its first answer avoids a flash of
+  // «USA». It is usually cached already. If that answer is an error, the detail doesn't wait for the retries
+  // (seconds): the names stay as in the CSV until one of them succeeds.
   const countries = useCountries()
+  const waitForCountries = countries.isPending && countries.failureCount === 0
 
   useDocumentTitle(movie.data && `${movie.data.original_title} (${movie.data.year})`)
 
-  if (movie.isPending || countries.isPending) return <p className={styles.loading}>Cargando la película…</p>
+  if (movie.isPending || waitForCountries) return <p className={styles.loading}>Cargando la película…</p>
   if (movie.isError) {
     const missing = movie.error instanceof ApiError && [400, 404].includes(movie.error.status)
     return (

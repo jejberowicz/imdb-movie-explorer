@@ -3,8 +3,8 @@
 - A row that can't be read doesn't stop the load: it is set aside in load_rejections, with its reason.
 - If the rejected rows go over a threshold (1% by default), nothing is written and the load fails.
 - The same file as the last load (same SHA-256) means there is nothing to do.
-- Otherwise the movies are replaced in one transaction with COPY: readers see the old data until the commit,
-  and running the load twice leaves the same state.
+- Otherwise the movies are replaced in one transaction with DELETE and COPY: readers see the old data until the
+  commit, and running the load twice leaves the same state.
 """
 
 import csv
@@ -37,6 +37,7 @@ from .parsers import (
     parse_whole,
     parse_year,
     repair_mojibake,
+    strip_invisible,
 )
 
 CSV_COLUMNS = (
@@ -56,6 +57,9 @@ MOVIE_COLUMNS = (
 LIST_COLUMNS = {"countries": "country", "languages": "language", "writers": "writer", "actors": "actors"}
 MONEY_COLUMNS = {"budget": "budget", "usa_gross": "usa_gross_income", "worldwide_gross": "worlwide_gross_income"}
 MAX_REJECTED_SHARE = 0.01
+# The longest field of the CSV has 415 characters (a list of actors): five times that is no field, it is a
+# broken row.
+MAX_FIELD_LENGTH = 2_000
 
 
 class LoadError(Exception):
@@ -122,6 +126,16 @@ def clean_row(row: dict[str, str], max_year: int) -> tuple[dict[str, Any], Count
     def note(*codes: str | None) -> None:
         corrections.update(code for code in codes if code)
 
+    def visible(text: str) -> str:
+        cleaned = strip_invisible(text)
+        if cleaned != text:
+            note("invisible_characters_removed")
+        return cleaned
+
+    # The description goes later, after its mojibake repair: the two damaged ones the repair fixes carry a C1
+    # control (U+0081 in «Ã\x81lvaro»), and removing it first would leave them broken for good.
+    row = {column: value if column == "description" else visible(value) for column, value in row.items()}
+
     def optional(column: str, parse: Any, value: str) -> Any:
         try:
             result, code = parse(value)
@@ -164,6 +178,7 @@ def clean_row(row: dict[str, str], max_year: int) -> tuple[dict[str, Any], Count
     if description is not None:
         description, code = repair_mojibake(description)
         note(code)
+        description = visible(description).strip() or None
     movie["description"] = description
     for column, source in MONEY_COLUMNS.items():
         money: Money | None = optional(column, parse_money, row[source])
@@ -198,7 +213,16 @@ def load(
         summary.skipped = True
         return summary
     with open_csv_bytes(path) as raw, io.TextIOWrapper(raw, encoding="utf-8-sig", newline="") as stream:
-        movies, rejected = _clean_rows(csv.DictReader(stream), path, summary, (today or date.today()).year)
+        reader = csv.DictReader(stream)
+        try:
+            movies, rejected = _clean_rows(reader, path, summary, (today or date.today()).year)
+        except (csv.Error, UnicodeDecodeError) as error:
+            # Not one bad row but a broken file: usually a quote that never closes, which turns the rest of the
+            # file into one field until it goes over the limit of the csv module (128 KiB). No row after that
+            # point can be trusted, so the load stops, instead of raising the limit and losing them in silence.
+            raise LoadError(
+                f"{path.name} can't be read after line {reader.line_num}: {error}. Nothing was loaded."
+            ) from error
 
     if summary.rows_read and summary.rows_rejected / summary.rows_read > max_rejected_share:
         raise LoadError(
@@ -216,6 +240,11 @@ def load(
     summary.rows_loaded = len(movies)
     with engine.begin() as conn:
         _write(conn, movies, rejected, summary)
+    # The deleted rows take space until a vacuum, and the planner needs statistics of the new ones. TRUNCATE false:
+    # by default VACUUM ends by cutting the empty pages off the file, with a lock that does block readers. It
+    # can't run inside a transaction.
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text("VACUUM (TRUNCATE false, ANALYZE) movies"))
     return summary
 
 
@@ -229,17 +258,28 @@ def _clean_rows(
     movies: list[dict[str, Any]] = []
     rejected: list[Rejection] = []
     seen: set[str] = set()
+    last_line = reader.line_num
     for row in reader:
-        summary.rows_read += 1
+        # A record can span several lines of the file. In this CSV none does, so one that does is a quote that
+        # never closes and swallowed the next rows: each swallowed line counts as a rejected row, so the
+        # threshold sees them instead of losing them in silence.
+        lines, first_line, last_line = reader.line_num - last_line, last_line + 1, reader.line_num
+        summary.rows_read += lines
         try:
             if None in row or None in row.values():
                 raise InvalidValue("wrong number of fields")
+            values = list(row.values())
+            if lines > 1 or any("\n" in value or "\r" in value for value in values):
+                raise InvalidValue("line break inside a field")
+            if any(len(value) > MAX_FIELD_LENGTH for value in values):
+                raise InvalidValue("field too long")
             movie, corrections = clean_row(row, max_year)
             if movie["imdb_title_id"] in seen:
                 raise InvalidValue("duplicate imdb_title_id")
         except InvalidValue as error:
-            summary.rejections[str(error)] += 1
-            rejected.append(Rejection(reader.line_num, row.get("imdb_title_id"), str(error), _raw(row)))
+            summary.rejections[str(error)] += lines
+            raw = _raw(row)
+            rejected.append(Rejection(first_line, raw.get("imdb_title_id"), str(error), raw))
             continue
         seen.add(movie["imdb_title_id"])
         summary.corrections.update(corrections)
@@ -271,7 +311,9 @@ def _write(conn: Connection, movies: list[dict[str, Any]], rejected: list[Reject
                 for r in rejected
             ],
         )  # fmt: skip
-    conn.execute(text("TRUNCATE movies"))
+    # DELETE and not TRUNCATE: TRUNCATE locks the table even for readers, so the API would wait, and fail after
+    # its statement_timeout, until the load commits. With DELETE, readers keep seeing the old rows meanwhile.
+    conn.execute(text("DELETE FROM movies"))
     cursor = conn.connection.dbapi_connection.cursor()
     with cursor.copy(f"COPY movies ({', '.join(MOVIE_COLUMNS)}) FROM STDIN") as copy:
         for movie in movies:
@@ -284,8 +326,15 @@ def _last_loaded_sha256(engine: Engine) -> str | None:
 
 
 def _raw(row: dict[str | None, Any]) -> dict[str, Any]:
-    """The row as it came, for load_rejections. Extra fields (under the None key) are kept apart."""
-    raw = {key: value for key, value in row.items() if key is not None}
+    """The row as it came, for load_rejections. Extra fields (under the None key) are kept apart.
+
+    Except for NUL characters: neither text nor JSONB can store them, and one would make the whole load fail.
+    """
+
+    def without_nul(value: str | None) -> str | None:
+        return value.replace("\x00", "") if value is not None else None
+
+    raw = {without_nul(key): without_nul(value) for key, value in row.items() if key is not None}
     if None in row:
-        raw["_extra_fields"] = row[None]
+        raw["_extra_fields"] = [without_nul(value) for value in row[None]]
     return raw

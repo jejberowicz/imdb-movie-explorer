@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it } from 'vitest'
 import { DETAILS } from '../test/fixtures'
-import { renderApp, searchOf } from '../test/render'
+import { findLegend, renderApp, searchOf } from '../test/render'
 import { listMovies, problem, recordMovieRequests, server, summary } from '../test/server'
 
 const card = (name: string) => screen.queryByRole('link', { name })
@@ -95,6 +95,41 @@ describe('browse page', () => {
     expect(searchOf(router)).toEqual({ page: ['2'] })
   })
 
+  it('keeps the keyboard focus on «Siguiente» when it reaches the last page', async () => {
+    server.use(
+      http.get('/api/movies', ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page'))
+        const items = DETAILS.slice((page - 1) * 4, page * 4).map(summary)
+        return HttpResponse.json({ items, page, page_size: 24, total: 30, total_pages: 2 })
+      }),
+    )
+    const { router, user } = renderApp()
+    await screen.findByRole('link', { name: 'The Shawshank Redemption (1994)' })
+    const next = screen.getByRole('button', { name: 'Siguiente →' })
+
+    next.focus()
+    await user.keyboard('{Enter}')
+
+    expect(await screen.findByText('Página 2 de 2')).toBeInTheDocument()
+    expect(next).toHaveFocus()
+    expect(next).toHaveAttribute('aria-disabled', 'true')
+    // On the last page it does nothing.
+    await user.keyboard('{Enter}')
+    expect(searchOf(router)).toEqual({ page: ['2'] })
+  })
+
+  it('goes to the last page from a page past the end', async () => {
+    const seen = recordMovieRequests()
+    const { router } = renderApp('/?genre=Drama&page=5000')
+
+    expect(await screen.findByRole('link', { name: 'Stalker (1979)' })).toBeInTheDocument()
+    expect(searchOf(router)).toEqual({ genre: ['Drama'] })
+    expect(seen.map((url) => url.searchParams.get('page'))).toEqual(['5000', '1'])
+    expect(screen.queryByText(/No encontramos películas/)).not.toBeInTheDocument()
+    // The empty page is replaced, not left behind in the history.
+    expect(router.state.historyAction).toBe('REPLACE')
+  })
+
   it('says when nothing matches and clears the filters', async () => {
     const { router, user } = renderApp('/?q=zzzz&genre=Drama')
     const empty = (await screen.findByText('No encontramos películas para «zzzz».')).parentElement!
@@ -117,28 +152,157 @@ describe('browse page', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('filters with the «Explorar por» menus', async () => {
+  it('offers to clear the filters when the API rejects them, since retrying would fail again', async () => {
+    server.use(http.get('/api/movies', () => problem(400, 'Invalid request parameters.'), { once: true }))
+    const { router, user } = renderApp('/?genre=Drama')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos buscar con estos filtros.')
+    expect(screen.queryByRole('button', { name: 'Reintentar' })).not.toBeInTheDocument()
+    await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Limpiar filtros' }))
+
+    expect(await screen.findByRole('link', { name: 'Stalker (1979)' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+  })
+
+  it('stops ordering by relevance when the search is cleared', async () => {
+    const seen = recordMovieRequests()
+    const { router, user } = renderApp('/?q=godfather&sort=relevance')
+    await screen.findByRole('link', { name: 'The Godfather (1972)' })
+
+    await user.clear(searchBox())
+
+    await waitFor(() => expect(cardNames()).toHaveLength(8))
+    expect(seen.at(-1)?.searchParams.get('sort')).toBeNull()
+    expect(searchOf(router)).toEqual({})
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('filters with the «Explorar por» menus, several decades at once', async () => {
     const { router, user } = renderApp()
     await screen.findByRole('link', { name: 'Stalker (1979)' })
 
     await user.click(screen.getByRole('button', { name: 'Género' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'Animación' }))
-    expect(await screen.findByRole('heading', { name: 'Mejor valoradas · Animación' })).toBeInTheDocument()
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Animación' }))
+    expect(await findLegend('Hay 3 películas del género Animación.')).toBeInTheDocument()
+    // The menu stays open to choose more; Esc closes it.
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Animación' })).toHaveAttribute('aria-checked', 'true')
+    await user.keyboard('{Escape}')
 
     await user.click(screen.getByRole('button', { name: 'Año' }))
-    await user.click(screen.getByRole('menuitemradio', { name: '2000s' }))
-    expect(await screen.findByRole('heading', { name: 'Mejor valoradas · Animación · 2000s' })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(cardNames()).toEqual(['Sen to Chihiro no kamikakushi (2001)', 'Egon & Dönci (2007)']),
+    await user.click(screen.getByRole('menuitemcheckbox', { name: '2000s' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: '2010s' }))
+    expect(await findLegend('Hay 3 películas del género Animación, estrenadas en los 2000s y 2010s.')).toBeInTheDocument()
+
+    // Choosing a chosen one again takes it out.
+    await user.click(screen.getByRole('menuitemcheckbox', { name: '2000s' }))
+    expect(await findLegend('Hay 1 película del género Animación, estrenada en los 2010s.')).toBeInTheDocument()
+    await waitFor(() => expect(cardNames()).toEqual(['La tortue rouge (2016)']))
+    expect(searchOf(router)).toEqual({ genre: ['Animation'], decade: ['2010'] })
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mejor valoradas')
+    expect(document.title).toBe('Mejor valoradas · Animación · 2010s · FakeIMDb')
+
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Todas' }))
+    await waitFor(() => expect(searchOf(router)).toEqual({ genre: ['Animation'] }))
+  })
+
+  it('keeps the legend of the movies on screen while the next ones load', async () => {
+    const { user } = renderApp('/?genre=Drama')
+    expect(await findLegend('Hay 4 películas del género Drama.')).toBeInTheDocument()
+    server.use(
+      http.get('/api/movies', async ({ request }) => {
+        await delay(300)
+        return HttpResponse.json(listMovies(new URL(request.url)))
+      }),
     )
-    expect(searchOf(router)).toEqual({ genre: ['Animation'], year_from: ['2000'], year_to: ['2009'] })
+
+    await user.click(screen.getByRole('button', { name: 'Género' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Policial' }))
+
+    // The count of the four dramas never goes with the words of the next filters.
+    expect(await findLegend('Hay 4 películas del género Drama.')).toBeInTheDocument()
+    expect(await findLegend('Hay 2 películas de los géneros Drama y Policial.')).toBeInTheDocument()
+  })
+
+  it('stacks genres: the movies that have all of them', async () => {
+    const { router, user } = renderApp('/?genre=Animation')
+    await screen.findByRole('link', { name: 'Egon & Dönci (2007)' })
+
+    await user.click(screen.getByRole('button', { name: 'Género' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Familiar' }))
+
+    expect(await findLegend('Hay 2 películas de los géneros Animación y Familiar.')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(cardNames()).toEqual(['Sen to Chihiro no kamikakushi (2001)', 'La tortue rouge (2016)']),
+    )
+    expect(searchOf(router)).toEqual({ genre: ['Animation', 'Family'] })
+  })
+
+  it('narrows a decade to some of its years with the strip below the bar', async () => {
+    const { router, user } = renderApp('/?decade=2000')
+    const strip = await screen.findByRole('group', { name: 'Años de los 2000s' })
+    // Only the years with movies.
+    await waitFor(() =>
+      expect(within(strip).getAllByRole('button').map((button) => button.textContent)).toEqual(['2000s', '2001', '2007']),
+    )
+    expect(within(strip).getByRole('button', { name: '2000s' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(within(strip).getByRole('button', { name: '2007' }))
+    expect(await findLegend('Hay 1 película estrenada en 2007.')).toBeInTheDocument()
+    expect(searchOf(router)).toEqual({ decade: ['2000'], year: ['2007'] })
+    expect(within(strip).getByRole('button', { name: '2007' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(strip).getByRole('button', { name: '2000s' })).toHaveAttribute('aria-pressed', 'false')
+
+    // A second year adds up, oldest first.
+    await user.click(within(strip).getByRole('button', { name: '2001' }))
+    expect(await findLegend('Hay 2 películas estrenadas en 2001 y 2007.')).toBeInTheDocument()
+    expect(searchOf(router)).toEqual({ decade: ['2000'], year: ['2001', '2007'] })
+    expect(within(strip).getByRole('button', { name: '2001' })).toHaveAttribute('aria-pressed', 'true')
+
+    // A chosen year again takes it out; the decade goes back to all of them.
+    await user.click(within(strip).getByRole('button', { name: '2007' }))
+    expect(await findLegend('Hay 1 película estrenada en 2001.')).toBeInTheDocument()
+    await user.click(within(strip).getByRole('button', { name: '2000s' }))
+    expect(await findLegend('Hay 2 películas estrenadas en los 2000s.')).toBeInTheDocument()
+    expect(searchOf(router)).toEqual({ decade: ['2000'] })
+
+    // Another decade starts without the years of this one.
+    await user.click(within(strip).getByRole('button', { name: '2007' }))
+    await user.click(screen.getByRole('button', { name: 'Año' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: '1990s' }))
+    await waitFor(() => expect(searchOf(router)).toEqual({ decade: ['2000', '1990'] }))
+
+    // A second decade has no strip: its years would be two lists.
+    await waitFor(() => expect(screen.queryByRole('group', { name: /^Años de/ })).not.toBeInTheDocument())
+  })
+
+  it('takes out an order chosen again, back to the default', async () => {
+    const { router, user } = renderApp()
+    await screen.findByRole('link', { name: 'Stalker (1979)' })
+
+    await user.click(screen.getByRole('button', { name: 'Rating' }))
+    await user.click(screen.getByRole('menuitemradio', { name: 'Más bajo primero' }))
+    await waitFor(() => expect(searchOf(router)).toEqual({ sort: ['rating'], order: ['asc'] }))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Peor valoradas')
+
+    await user.click(screen.getByRole('button', { name: 'Rating' }))
+    expect(screen.getByRole('menuitemradio', { name: 'Más bajo primero' })).toHaveAttribute('aria-checked', 'true')
+    await user.click(screen.getByRole('menuitemradio', { name: 'Más bajo primero' }))
+    await waitFor(() => expect(searchOf(router)).toEqual({}))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mejor valoradas')
+  })
+
+  it('shows an odd genre of the URL as it comes, not as code', async () => {
+    renderApp('/?genre=constructor')
+    expect(await screen.findByText('No encontramos películas.')).toBeInTheDocument()
+    expect(document.title).toBe('Mejor valoradas · constructor · FakeIMDb')
   })
 
   it('reads the state from the URL, so a search can be shared', async () => {
     const seen = recordMovieRequests()
     renderApp('/?genre=Crime&sort=year&order=asc')
 
-    expect(await screen.findByRole('heading', { name: 'Más viejas · Policial' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Más viejas' })).toBeInTheDocument()
+    expect(await findLegend('Hay 2 películas del género Policial.')).toBeInTheDocument()
     await waitFor(() => expect(cardNames()).toEqual(['The Godfather (1972)', 'The Godfather: Part II (1974)']))
     const params = seen[0].searchParams
     expect([params.get('genre'), params.get('sort'), params.get('order'), params.get('page_size')]).toEqual([
@@ -147,6 +311,33 @@ describe('browse page', () => {
       'asc',
       '24',
     ])
+  })
+
+  it('keeps the space when the user pauses between two words', async () => {
+    const { router, user } = renderApp()
+    await screen.findByRole('link', { name: 'Stalker (1979)' })
+
+    await user.type(searchBox(), 'the ')
+    await wait(400)
+    await user.type(searchBox(), 'god')
+
+    expect(searchBox()).toHaveValue('the god')
+    await waitFor(() => expect(searchOf(router)).toEqual({ q: ['the god'] }))
+  })
+
+  it('undoes a typed search with the back button, back to the list from before', async () => {
+    const { router, user } = renderApp('/?genre=Drama')
+    await screen.findByRole('link', { name: 'Stalker (1979)' })
+
+    await user.type(searchBox(), 'stal')
+    await waitFor(() => expect(searchOf(router)).toEqual({ q: ['stal'], genre: ['Drama'] }))
+    await user.type(searchBox(), 'ker')
+    await waitFor(() => expect(searchOf(router)).toEqual({ q: ['stalker'], genre: ['Drama'] }))
+
+    // One entry for the whole search, not one per pause.
+    await act(() => router.navigate(-1))
+    expect(router.state.location.search).toBe('?genre=Drama')
+    await waitFor(() => expect(searchBox()).toHaveValue(''))
   })
 
   it('changes the URL once per search: Enter and the back button don\'t make it bounce', async () => {
@@ -180,6 +371,8 @@ describe('table view', () => {
 
     await user.click(screen.getByRole('button', { name: 'Tabla' }))
     const table = screen.getByRole('table')
+    // The default order is by rating, and the header says so before anything is chosen.
+    expect(within(table).getByRole('columnheader', { name: /Rating/ })).toHaveAttribute('aria-sort', 'descending')
     expect(within(table).getAllByRole('row')).toHaveLength(9)
     expect(localStorage.getItem('fakeimdb:view')).toBe('table')
 
@@ -193,6 +386,30 @@ describe('table view', () => {
     await user.click(screen.getByRole('button', { name: 'Duración' }))
     await waitFor(() => expect(searchOf(router)).toEqual({ sort: ['duration'], order: ['asc'] }))
     expect(screen.getByRole('columnheader', { name: 'Duración' })).toHaveAttribute('aria-sort', 'ascending')
+  })
+
+  it('shows where each movie is from, in Spanish', async () => {
+    localStorage.setItem('fakeimdb:view', 'table')
+    renderApp()
+    const table = await screen.findByRole('table')
+    expect(within(table).getByRole('columnheader', { name: 'País' })).toBeInTheDocument()
+    const row = (title: string) => within(table).getByRole('link', { name: title }).closest('tr')!
+    await waitFor(() => expect(row('Stalker')).toHaveTextContent('Unión Soviética'))
+    expect(row('Il buono, il brutto, il cattivo')).toHaveTextContent('Italia, España, Alemania Occidental')
+  })
+
+  it('says that the order by rating weighs the votes, since the column shows the plain average', async () => {
+    localStorage.setItem('fakeimdb:view', 'table')
+    const { user } = renderApp()
+    const table = await screen.findByRole('table')
+    const note = /El orden por rating tiene en cuenta la cantidad de votos/
+
+    // The default order is the weighted rating too (ADR 0008).
+    expect(table).toHaveAccessibleDescription(note)
+    await user.click(within(table).getByRole('button', { name: 'Votos' }))
+    await waitFor(() => expect(screen.queryByText(note)).not.toBeInTheDocument())
+    await user.click(within(screen.getByRole('table')).getByRole('button', { name: 'Rating' }))
+    expect(await screen.findByText(note)).toBeInTheDocument()
   })
 
   it('always shows the posters on a phone', async () => {

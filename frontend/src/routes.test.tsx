@@ -32,7 +32,7 @@ describe('navigation', () => {
   it('opens the map from the País menu, keeping the filters', async () => {
     const { router, user } = renderApp('/?genre=Drama&page=2')
     await user.click(await screen.findByRole('button', { name: 'País' }))
-    await user.click(screen.getByRole('menuitemradio', { name: 'Ver el mapa de países' }))
+    await user.click(screen.getByRole('menuitem', { name: 'Ver el mapa de países' }))
 
     expect(await screen.findByRole('heading', { name: 'Por país' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/countries')

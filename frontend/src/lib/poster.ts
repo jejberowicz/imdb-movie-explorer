@@ -62,7 +62,8 @@ export function hash(text: string): number {
 }
 
 export function familyOf(genres: string[]): Family {
-  return FAMILY[genres[0]] ?? 'otros'
+  const genre = genres[0]
+  return genre !== undefined && Object.hasOwn(FAMILY, genre) ? FAMILY[genre] : 'otros'
 }
 
 export function posterDesign(movie: { imdb_title_id: string; original_title: string; genres: string[] }): PosterDesign {
