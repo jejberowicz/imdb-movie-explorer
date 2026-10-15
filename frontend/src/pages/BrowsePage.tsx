@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ApiError } from '../api/client'
 import { fetchMovies } from '../api/movies'
@@ -57,6 +57,16 @@ export default function BrowsePage() {
   const data = movies.data
   const clear = () => navigate('/')
 
+  // A page past the last one (an old link, or fewer movies after a new load) comes back empty: go to the last
+  // page instead, replacing the entry so the back button doesn't return to the empty one.
+  const lastPage =
+    data && !movies.isPlaceholderData && data.items.length === 0 && data.total > 0 && state.page > data.total_pages
+      ? data.total_pages
+      : undefined
+  useEffect(() => {
+    if (lastPage !== undefined) change({ page: lastPage }, true)
+  }, [lastPage, change])
+
   return (
     <>
       <BrowseBar state={state} genres={genres.data?.items.map((genre) => genre.name) ?? []} onChange={change} />
@@ -95,7 +105,8 @@ export default function BrowsePage() {
           ) : (
             <ErrorState message="No pudimos cargar las películas." onRetry={() => movies.refetch()} />
           ))}
-        {data && data.items.length === 0 && (
+        {/* An empty page with movies in total is past the end: the effect above is already moving to the last. */}
+        {data && data.total === 0 && (
           <EmptyState query={state.q.trim()} onClear={hasFilters(state) ? clear : undefined} />
         )}
         {data && data.items.length > 0 && (

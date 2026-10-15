@@ -95,6 +95,18 @@ describe('browse page', () => {
     expect(searchOf(router)).toEqual({ page: ['2'] })
   })
 
+  it('goes to the last page from a page past the end', async () => {
+    const seen = recordMovieRequests()
+    const { router } = renderApp('/?genre=Drama&page=5000')
+
+    expect(await screen.findByRole('link', { name: 'Stalker (1979)' })).toBeInTheDocument()
+    expect(searchOf(router)).toEqual({ genre: ['Drama'] })
+    expect(seen.map((url) => url.searchParams.get('page'))).toEqual(['5000', '1'])
+    expect(screen.queryByText(/No encontramos películas/)).not.toBeInTheDocument()
+    // The empty page is replaced, not left behind in the history.
+    expect(router.state.historyAction).toBe('REPLACE')
+  })
+
   it('says when nothing matches and clears the filters', async () => {
     const { router, user } = renderApp('/?q=zzzz&genre=Drama')
     const empty = (await screen.findByText('No encontramos películas para «zzzz».')).parentElement!
