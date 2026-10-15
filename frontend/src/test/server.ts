@@ -42,6 +42,7 @@ export function listMovies(url: URL): Page<MovieSummary> {
   const genres = params.getAll('genre')
   const countries = params.getAll('country')
   const decades = params.getAll('decade').map(Number)
+  const years = params.getAll('year').map(Number)
   const from = Number(params.get('year_from') ?? 0)
   const to = Number(params.get('year_to') ?? 9999)
   const sort = params.get('sort') ?? (title ? 'relevance' : 'rating')
@@ -55,6 +56,7 @@ export function listMovies(url: URL): Page<MovieSummary> {
       genres.every((genre) => movie.genres.includes(genre)) &&
       (!countries.length || countries.some((country) => movie.countries?.includes(country))) &&
       (!decades.length || decades.some((decade) => movie.year >= decade && movie.year <= decade + 9)) &&
+      (!years.length || years.includes(movie.year)) &&
       movie.year >= from &&
       movie.year <= to,
   ).sort((a, b) => {

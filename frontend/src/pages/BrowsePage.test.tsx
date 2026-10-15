@@ -237,7 +237,7 @@ describe('browse page', () => {
     expect(searchOf(router)).toEqual({ genre: ['Animation', 'Family'] })
   })
 
-  it('narrows a decade to one of its years with the strip below the bar', async () => {
+  it('narrows a decade to some of its years with the strip below the bar', async () => {
     const { router, user } = renderApp('/?decade=2000')
     const strip = await screen.findByRole('group', { name: 'Años de los 2000s' })
     // Only the years with movies.
@@ -248,17 +248,30 @@ describe('browse page', () => {
 
     await user.click(within(strip).getByRole('button', { name: '2007' }))
     expect(await findLegend('Hay 1 película estrenada en 2007.')).toBeInTheDocument()
-    expect(searchOf(router)).toEqual({ decade: ['2000'], year_from: ['2007'], year_to: ['2007'] })
+    expect(searchOf(router)).toEqual({ decade: ['2000'], year: ['2007'] })
     expect(within(strip).getByRole('button', { name: '2007' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(strip).getByRole('button', { name: '2000s' })).toHaveAttribute('aria-pressed', 'false')
 
-    // The chosen year again goes back to the whole decade.
+    // A second year adds up, oldest first.
+    await user.click(within(strip).getByRole('button', { name: '2001' }))
+    expect(await findLegend('Hay 2 películas estrenadas en 2001 y 2007.')).toBeInTheDocument()
+    expect(searchOf(router)).toEqual({ decade: ['2000'], year: ['2001', '2007'] })
+    expect(within(strip).getByRole('button', { name: '2001' })).toHaveAttribute('aria-pressed', 'true')
+
+    // A chosen year again takes it out; the decade goes back to all of them.
     await user.click(within(strip).getByRole('button', { name: '2007' }))
+    expect(await findLegend('Hay 1 película estrenada en 2001.')).toBeInTheDocument()
+    await user.click(within(strip).getByRole('button', { name: '2000s' }))
     expect(await findLegend('Hay 2 películas estrenadas en los 2000s.')).toBeInTheDocument()
     expect(searchOf(router)).toEqual({ decade: ['2000'] })
 
-    // A second decade has no strip: its years would be two lists.
+    // Another decade starts without the years of this one.
+    await user.click(within(strip).getByRole('button', { name: '2007' }))
     await user.click(screen.getByRole('button', { name: 'Año' }))
     await user.click(screen.getByRole('menuitemcheckbox', { name: '1990s' }))
+    await waitFor(() => expect(searchOf(router)).toEqual({ decade: ['2000', '1990'] }))
+
+    // A second decade has no strip: its years would be two lists.
     await waitFor(() => expect(screen.queryByRole('group', { name: /^Años de/ })).not.toBeInTheDocument())
   })
 

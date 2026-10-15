@@ -16,13 +16,13 @@ import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useViewPreference } from '../hooks/useViewPreference'
 import {
   type BrowseState,
-  chosenYear,
   documentTitle,
   hasChoices,
   hasFilters,
   legend,
   readBrowseState,
   sectionTitle,
+  toggle,
   toMovieQuery,
   writeBrowseState,
 } from '../lib/browse'
@@ -127,8 +127,15 @@ export default function BrowsePage() {
           <YearStrip
             decade={decade}
             years={years.data?.items.map((item) => item.year).filter((year) => year >= decade && year <= decade + 9)}
-            chosen={chosenYear(state)}
-            onChoose={(year) => change({ yearFrom: year, yearTo: year, page: 1 })}
+            chosen={state.years}
+            onChoose={(year) =>
+              change({
+                years: year === undefined ? [] : toggle(state.years, year).sort((a, b) => a - b),
+                yearFrom: undefined,
+                yearTo: undefined,
+                page: 1,
+              })
+            }
           />
         )}
         <div aria-live="polite">

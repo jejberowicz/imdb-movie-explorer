@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   browsePath,
-  chosenYear,
   documentTitle,
   hasChoices,
   hasFilters,
@@ -22,13 +21,14 @@ describe('browse state in the URL', () => {
     expect(
       read(
         'q=godfather&genre=Crime&genre=Drama&country=USA&country=Italy&decade=1960&decade=1970' +
-          '&year_from=1970&year_to=1979&sort=votes&order=asc&page=3',
+          '&year=1975&year=1972&year_from=1970&year_to=1979&sort=votes&order=asc&page=3',
       ),
     ).toEqual({
         q: 'godfather',
         genres: ['Crime', 'Drama'],
         countries: ['USA', 'Italy'],
         decades: [1970, 1960],
+        years: [1972, 1975],
         yearFrom: 1970,
         yearTo: 1979,
         sort: 'votes',
@@ -38,12 +38,13 @@ describe('browse state in the URL', () => {
   })
 
   it('ignores values that the API would reject, instead of failing', () => {
-    expect(read('page=-2&sort=drop&order=up&year_from=19x0&decade=1995&decade=1870&decade=x')).toEqual({
+    expect(read('page=-2&sort=drop&order=up&year_from=19x0&decade=1995&decade=1870&decade=x&year=1700&year=y')).toEqual({
       q: '',
       page: 1,
       genres: [],
       countries: [],
       decades: [],
+      years: [],
     })
     expect(read('page=0').page).toBe(1)
   })
@@ -58,6 +59,8 @@ describe('browse state in the URL', () => {
     expect(read('q=ma%00trix').q).toBe('matrix')
     expect(read(`genre=${'g'.repeat(41)}&genre=Drama`).genres).toEqual(['Drama'])
     expect(read('genre=Drama&genre=Drama&decade=1990&decade=1990')).toMatchObject({ genres: ['Drama'], decades: [1990] })
+    expect(read('year=1994&year=1994').years).toEqual([1994])
+    expect(read(Array.from({ length: 60 }, (_, index) => `year=${1900 + index}`).join('&')).years).toHaveLength(50)
     expect(read(Array.from({ length: 12 }, (_, index) => `genre=G${index}`).join('&')).genres).toHaveLength(10)
     const many = Array.from({ length: 25 }, (_, index) => `country=C${index}`).join('&')
     expect(read(many).countries).toHaveLength(20)
@@ -81,7 +84,7 @@ describe('browse state in the URL', () => {
 
   it('round-trips through the URL', () => {
     const search =
-      'q=matrix&genre=Action&genre=Sci-Fi&country=USA&decade=1990&year_from=1999&year_to=1999&sort=rating&order=desc&page=2'
+      'q=matrix&genre=Action&genre=Sci-Fi&country=USA&decade=1990&year=1994&year=1999&year_from=1990&year_to=1999&sort=rating&order=desc&page=2'
     expect(writeBrowseState(read(search)).toString()).toBe(search)
   })
 
@@ -95,21 +98,15 @@ describe('browse state in the URL', () => {
       genres: undefined,
       countries: ['USA'],
       decades: undefined,
+      years: undefined,
       yearFrom: undefined,
       yearTo: undefined,
     })
-    expect(toMovieQuery(read('genre=Crime&genre=Drama&decade=1970'))).toMatchObject({
+    expect(toMovieQuery(read('genre=Crime&genre=Drama&decade=1970&year=1975'))).toMatchObject({
       genres: ['Crime', 'Drama'],
       decades: [1970],
+      years: [1975],
     })
-  })
-
-  it('knows the year chosen in the strip, only inside the single decade chosen', () => {
-    expect(chosenYear(read('decade=1990&year_from=1994&year_to=1994'))).toBe(1994)
-    expect(chosenYear(read('decade=1990'))).toBeUndefined()
-    expect(chosenYear(read('decade=1990&year_from=2004&year_to=2004'))).toBeUndefined()
-    expect(chosenYear(read('decade=1990&decade=2000&year_from=1994&year_to=1994'))).toBeUndefined()
-    expect(chosenYear(read('decade=1990&year_from=1990&year_to=1999'))).toBeUndefined()
   })
 
   it('knows when something is chosen', () => {
@@ -117,6 +114,7 @@ describe('browse state in the URL', () => {
     expect(hasFilters(read('page=4'))).toBe(false)
     expect(hasFilters(read('q=x'))).toBe(true)
     expect(hasFilters(read('decade=1990'))).toBe(true)
+    expect(hasFilters(read('year=1994'))).toBe(true)
     // The order alone is no filter, but it can be cleared.
     expect(hasFilters(read('sort=votes'))).toBe(false)
     expect(hasChoices(read('sort=votes'))).toBe(true)
@@ -171,8 +169,12 @@ describe('the legend of the filters', () => {
       'Hay *12 películas* de los géneros *Comedia y Romance*, hechas en *Italia o Francia*, estrenadas en los ' +
         '*1990s y 2010s*.',
     )
-    expect(said(legend(read('genre=Drama&decade=1990&year_from=1994&year_to=1994'), 1, { genres: ['Drama'], countries: [] }))).toBe(
+    expect(said(legend(read('genre=Drama&decade=1990&year=1994'), 1, { genres: ['Drama'], countries: [] }))).toBe(
       'Hay *1 película* del género *Drama*, estrenada en *1994*.',
+    )
+    // The years of the strip, without the decade they are in.
+    expect(said(legend(read('decade=1990&year=1997&year=1994&year=1999'), 7, none))).toBe(
+      'Hay *7 películas* estrenadas en *1994, 1997 y 1999*.',
     )
     expect(said(legend(read('q=padrino'), 3, none))).toBe('Hay *3 películas* con *«padrino»* en el título.')
     expect(said(legend(read('year_from=1950&year_to=1960'), 9, none))).toBe(

@@ -69,11 +69,12 @@ export function BrowseBar({ state, genres, decades = DECADES, onChange }: Browse
           options={decadeOptions}
           multiple
           selected={state.decades.length ? state.decades : [null]}
-          active={state.decades.length > 0 || state.yearFrom !== undefined || state.yearTo !== undefined}
-          // The year chosen in the strip belongs to one decade: another set of decades starts without it.
+          active={state.decades.length > 0 || state.years.length > 0 || state.yearFrom !== undefined || state.yearTo !== undefined}
+          // The years chosen in the strip belong to one decade: another set of decades starts without them.
           onSelect={(decade) =>
             onChange({
               decades: decade === null ? [] : toggle(state.decades, decade).sort((a, b) => b - a),
+              years: [],
               yearFrom: undefined,
               yearTo: undefined,
               page: 1,

@@ -71,6 +71,7 @@ export interface MovieQuery {
   genres?: string[]
   countries?: string[]
   decades?: number[]
+  years?: number[]
   yearFrom?: number
   yearTo?: number
 }
@@ -87,6 +88,7 @@ export function fetchMovies(query: MovieQuery, signal?: AbortSignal): Promise<Pa
       genre: query.genres,
       country: query.countries,
       decade: query.decades,
+      year: query.years,
       year_from: query.yearFrom,
       year_to: query.yearTo,
     },
