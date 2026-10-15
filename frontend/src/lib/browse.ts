@@ -147,7 +147,8 @@ export function sectionTitle(state: BrowseState, labels: { genre?: string; count
   const parts: string[] = []
   const query = state.q.trim()
   if (query) parts.push(`Resultados para «${query}»`)
-  if (!query || state.sort) {
+  // A search is ordered by relevance unless another order is chosen: that one needs no words.
+  if (!query || (state.sort && state.sort !== 'relevance')) {
     const sort = state.sort && state.sort !== 'relevance' ? state.sort : 'rating'
     const order = state.order ?? (sort === 'title' ? 'asc' : 'desc')
     parts.push(ORDER_TITLES[`${sort}-${order}`])

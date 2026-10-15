@@ -91,6 +91,8 @@ describe('the title of the results', () => {
     expect(sectionTitle(read(''), {})).toBe('Mejor valoradas')
     expect(sectionTitle(read('q=godfather'), {})).toBe('Resultados para «godfather»')
     expect(sectionTitle(read('q=godfather&sort=year&order=asc'), {})).toBe('Resultados para «godfather» · Más viejas')
+    expect(sectionTitle(read('q=matrix&sort=relevance'), {})).toBe('Resultados para «matrix»')
+    expect(sectionTitle(read('q=matrix&sort=relevance&order=asc'), {})).toBe('Resultados para «matrix»')
     expect(sectionTitle(read('sort=title'), {})).toBe('De la A a la Z')
     expect(sectionTitle(read('genre=Drama&year_from=1990&year_to=1999'), { genre: 'Drama' })).toBe(
       'Mejor valoradas · Drama · 1990s',
