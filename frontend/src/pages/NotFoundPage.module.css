@@ -1,0 +1,15 @@
+.box {
+  padding: 64px 0;
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 12px;
+  font: 700 28px/1.2 var(--font-display);
+  text-transform: uppercase;
+}
+
+.text {
+  margin: 0 0 16px;
+  color: var(--muted);
+}

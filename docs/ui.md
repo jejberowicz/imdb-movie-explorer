@@ -105,11 +105,20 @@ Letterboxd. La dirección se validó con una maqueta navegable hecha con datos r
 +------------------------------------------------------------------------------+
 ```
 
-- **El mapa** pinta los países que ya no existen sobre un sucesor, y al pasar el mouse lo aclara: «Rusia
-  (incluye Unión Soviética)». Un clic abre la lista de películas de ese país y de los que se le suman
-  ([ADR 0009](decisions/0009-browse-by-country.md)).
-- **La lista de abajo muestra los países tal como vienen en el CSV**, en español y con buscador. Es la
-  alternativa accesible al mapa: se usa con el teclado y con lector de pantalla.
+- **El mapa** pinta los países que ya no existen sobre un sucesor, y al pasar el mouse lo aclara: «Rusia:
+  1.083 películas · Unión Soviética: 866 películas». Un clic abre la lista de películas de ese país y de los
+  que se le suman ([ADR 0009](decisions/0009-browse-by-country.md)).
+- **Cada tono abarca diez veces más que el anterior:** 1–9, 10–99, 100–999, 1.000–9.999 y 10.000 o más, porque las cantidades van
+  de 1 a 34.325 (Estados Unidos). Una leyenda los explica.
+- **Los países chicos son puntos:** a escala 1:110m no hay forma para Hong Kong (1.884 películas), Singapur o
+  Malta, así que se dibujan como un punto. La Antártida no se dibuja.
+- **La lista de abajo muestra los países tal como vienen en el CSV**, en español, ordenados de la A a la Z y
+  con buscador, que ignora tildes y acepta también el nombre en inglés. Los que ya no existen llevan la
+  marca «ya no existe». Es la alternativa accesible al mapa: se usa con el teclado y con lector de pantalla.
+- **Los filtros elegidos antes se mantienen:** si se abre el mapa con «Drama» elegido, un país abre los
+  dramas de ese país.
+- **El mapa se descarga aparte**, solo al abrir esta página: d3-geo y las formas pesan unos 67 KB comprimidos.
+  Los datos salen de Natural Earth, de dominio público, con `scripts/build_world_map.py`.
 
 ## Estados
 
