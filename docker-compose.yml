@@ -7,7 +7,9 @@
 # Override them in a .env file (see .env.example).
 name: imdb-movie-explorer
 
-x-database-url: &database-url postgresql+psycopg://movies:${POSTGRES_PASSWORD:-movies-local-only}@db:5432/movies
+# The owner runs the migrations and the load; the API connects with a user that can only read (db/init).
+x-owner-url: &owner-url postgresql+psycopg://movies:${POSTGRES_PASSWORD:-movies-local-only}@db:5432/movies
+x-api-url: &api-url postgresql+psycopg://movies_api:${API_DB_PASSWORD:-api-local-only}@db:5432/movies
 
 services:
   db:
@@ -16,8 +18,11 @@ services:
       POSTGRES_DB: movies
       POSTGRES_USER: movies
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-movies-local-only}
+      API_DB_PASSWORD: ${API_DB_PASSWORD:-api-local-only}
     volumes:
       - db-data:/var/lib/postgresql
+      # Creates the read-only user of the API, the first time only
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U movies -d movies"]
       interval: 2s
@@ -31,7 +36,7 @@ services:
       target: runtime
     command: ["sh", "-c", "alembic upgrade head && flask --app app seed /data/IMDb_movies.csv.gz"]
     environment:
-      DATABASE_URL: *database-url
+      DATABASE_URL: *owner-url
     volumes:
       - ./data:/data:ro
     depends_on:
@@ -45,7 +50,7 @@ services:
       context: ./backend
       target: runtime
     environment:
-      DATABASE_URL: *database-url
+      DATABASE_URL: *api-url
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
       # nginx is in front and adds X-Forwarded-For: the API takes the client IP from there.
       PROXY_HOPS: 1
