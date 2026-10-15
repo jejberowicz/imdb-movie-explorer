@@ -55,7 +55,8 @@ copiá `.env.example` a `.env`, que no se commitea.
 
 | Variable | Por defecto | Para qué |
 |---|---|---|
-| `POSTGRES_PASSWORD` | `movies-local-only` | Contraseña del dueño de la base, que corre las migraciones y la carga |
+| `POSTGRES_PASSWORD` | `postgres-local-only` | Contraseña del superusuario. Solo sirve para administrar desde adentro del contenedor: por la red no puede entrar |
+| `MOVIES_DB_PASSWORD` | `movies-local-only` | Contraseña del dueño de la base, que corre las migraciones y la carga y no es superusuario |
 | `API_DB_PASSWORD` | `api-local-only` | Contraseña de `movies_api`, el usuario de solo lectura de la API |
 | `API_PORT`, `WEB_PORT` | `8000`, `8080` | Puertos publicados en esta máquina |
 | `GUNICORN_WORKERS` | `2` | Procesos de la API |
@@ -89,8 +90,8 @@ npm ci
 npm run dev
 ```
 
-Así la API usa el usuario dueño. El usuario de solo lectura lo crea `db/init/01-api-reader.sh`, que también
-se puede correr a mano.
+Así la API usa el usuario dueño. Los usuarios separados (dueño sin superusuario y API de solo lectura) los crea
+`db/init/01-roles.sh` en Docker.
 
 ## La API
 

@@ -7,8 +7,9 @@
 # Override them in a .env file (see .env.example).
 name: imdb-movie-explorer
 
-# The owner runs the migrations and the load; the API connects with a user that can only read (db/init).
-x-owner-url: &owner-url postgresql+psycopg://movies:${POSTGRES_PASSWORD:-movies-local-only}@db:5432/movies
+# The owner runs the migrations and the load; the API connects with a user that can only read. The superuser
+# can't log in over the network (db/init/01-roles.sh).
+x-owner-url: &owner-url postgresql+psycopg://movies:${MOVIES_DB_PASSWORD:-movies-local-only}@db:5432/movies
 x-api-url: &api-url postgresql+psycopg://movies_api:${API_DB_PASSWORD:-api-local-only}@db:5432/movies
 
 services:
@@ -16,12 +17,12 @@ services:
     image: postgres:18.6-trixie
     environment:
       POSTGRES_DB: movies
-      POSTGRES_USER: movies
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-movies-local-only}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local-only}
+      MOVIES_DB_PASSWORD: ${MOVIES_DB_PASSWORD:-movies-local-only}
       API_DB_PASSWORD: ${API_DB_PASSWORD:-api-local-only}
     volumes:
       - db-data:/var/lib/postgresql
-      # Creates the read-only user of the API, the first time only
+      # Creates the owner and the read-only user of the API, the first time only
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U movies -d movies"]

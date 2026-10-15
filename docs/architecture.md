@@ -196,8 +196,10 @@ unos milisegundos, y `EXPLAIN ANALYZE` no mostró que hiciera falta ([performanc
 
 ### Usuarios de la base
 
-- **El dueño** (migraciones y seed) crea tablas y escribe.
+- **El superusuario** solo administra, desde adentro del contenedor: por la red no puede entrar.
+- **El dueño, `movies`,** (migraciones y seed) crea tablas y escribe, pero no es superusuario: con su
+  contraseña no se pueden correr comandos en el servidor.
 - **El de la API, `movies_api`,** solo puede leer (`SELECT`), todas sus transacciones son de solo lectura y
   tiene un `statement_timeout` de 5 s, para cortar cualquier consulta inesperadamente cara. Lo crea
-  `db/init/01-api-reader.sh` cuando se crea la base.
+  `db/init/01-roles.sh` cuando se crea la base.
 - Las credenciales llegan por variables de entorno. En el repo solo está `.env.example`, sin valores reales.

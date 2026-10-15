@@ -17,8 +17,8 @@ concreta. El plan con el que se diseñó está en [docs/security-plan.md](docs/s
 |---|---|---|
 | Inyección SQL | Consultas siempre parametrizadas con SQLAlchemy. `ORDER BY` no se puede parametrizar, así que `sort` y `order` pasan por una lista blanca. Los comodines `%` y `_` de `LIKE` se escapan. Un test manda `sort=title;DROP TABLE movies`: responde 400 y la tabla sigue ahí | `repositories/movies.py`, `test_acceptance.py` |
 | Entradas abusivas | Pydantic valida tipos, rangos y largos: `title` hasta 200 caracteres, `page_size` hasta 100, hasta 20 países. Los textos no aceptan caracteres de control. Lo inválido responde 400 con el parámetro y el motivo | `schemas/movies.py` |
-| Escribir en la base desde la API | La API se conecta con `movies_api`, que solo tiene `SELECT` y cuyas transacciones son de solo lectura. Las migraciones y la carga usan otro usuario | `db/init/01-api-reader.sh` |
-| Una consulta cara que acapare la base | `statement_timeout` de 5 s en el usuario de la API. El pedido real más lento tarda unos 60 ms de punta a punta ([docs/performance.md](docs/performance.md)) | `db/init/01-api-reader.sh` |
+| Escribir en la base desde la API | La API se conecta con `movies_api`, que solo tiene `SELECT` y cuyas transacciones son de solo lectura. Las migraciones y la carga usan el dueño, `movies`, que no es superusuario; el superusuario no puede entrar por la red, así que ni con código en la API se llega a ejecutar comandos en el servidor de la base | `db/init/01-roles.sh` |
+| Una consulta cara que acapare la base | `statement_timeout` de 5 s en el usuario de la API. El pedido real más lento tarda unos 60 ms de punta a punta ([docs/performance.md](docs/performance.md)) | `db/init/01-roles.sh` |
 | Abuso por volumen | 300 pedidos por minuto por IP con Flask-Limiter, y 429 con `Retry-After` al pasarse. Detrás de nginx, la IP sale de `X-Forwarded-For`, que nginx reescribe; sin proxy, ese header se ignora. Solo el healthcheck de Docker, desde adentro del contenedor, queda exento | `app/security.py` |
 | XSS con datos del CSV | Los datos se tratan como no confiables: React escapa todo y no hay `dangerouslySetInnerHTML`, `innerHTML` ni `eval`. Además, la CSP solo permite scripts del propio origen, sin `unsafe-inline` | `frontend/nginx/security-headers.conf` |
 | Clickjacking | `frame-ancestors 'none'` en la CSP del sitio y de la API, y `X-Frame-Options: DENY` en la API | nginx y `app/security.py` |
@@ -42,9 +42,9 @@ concreta. El plan con el que se diseñó está en [docs/security-plan.md](docs/s
   está publicado en `127.0.0.1`.
 - **Las contraseñas por defecto de `docker-compose.yml`** sirven solo para una base local que no se publica
   fuera de Docker. En cualquier otro entorno se cambian con `.env`.
-- **La carga corre con el superusuario de la base** que crea la imagen de PostgreSQL. Solo se usa dentro de la
-  red de Docker y con contraseña; la API, que es lo expuesto, usa el usuario de solo lectura. En producción,
-  el dueño de las tablas sería un usuario sin privilegios de superusuario.
+- **La contraseña del dueño tiene un valor por defecto.** Quien lograra ejecutar código en la API y la
+  conociera podría modificar el catálogo (no ejecutar comandos: el dueño no es superusuario). Fuera de una
+  máquina local, las contraseñas se cambian con `.env`.
 - **El puerto directo de la API confía en `X-Forwarded-For`**, porque en Docker siempre hay un nginx adelante.
   Alguien en esta misma máquina podría inventarse una IP para esquivar el límite; desde afuera no se llega a
   ese puerto.

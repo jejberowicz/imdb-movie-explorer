@@ -70,6 +70,6 @@ npm run build
 ## Docker y CI
 
 - **`docker compose up --build`** levanta todo; `docker compose down -v` borra también la base. La API usa el
-  usuario de solo lectura que crea `db/init/01-api-reader.sh` la primera vez que se crea la base.
+  usuario de solo lectura que crea `db/init/01-roles.sh` la primera vez que se crea la base.
 - **El CI** (`.github/workflows/ci.yml`) corre ruff, pytest con PostgreSQL, pip-audit, oxlint, tsc, Vitest,
   npm audit y un `docker compose up` con un smoke test. Las actions están fijadas a un commit.
