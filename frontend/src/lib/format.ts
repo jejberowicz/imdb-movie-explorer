@@ -9,8 +9,11 @@ const oneDecimal = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 1, ma
 /** 2278845 -> "2.278.845" */
 export const formatNumber = (value: number): string => integer.format(value)
 
-/** 2278845 -> "2,3 M", for the cards */
-export const formatCompact = (value: number): string => compact.format(value)
+/**
+ * 2278845 -> "2,3 M", 13200 -> "13,2 k", for the cards. The Spanish data of Intl writes thousands as "3 K" below
+ * 10.000 and "13,2 k" above, so the cards would mix both: always "k".
+ */
+export const formatCompact = (value: number): string => compact.format(value).replace(/(\s)K$/, '$1k')
 
 /** 9.3 -> "9,3" */
 export const formatRating = (value: number): string => oneDecimal.format(value)
