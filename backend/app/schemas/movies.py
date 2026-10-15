@@ -29,6 +29,8 @@ def no_control_characters(value: str) -> str:
 Text = Annotated[str, AfterValidator(no_control_characters)]
 SortField = Literal["relevance", "rating", "year", "votes", "duration", "title"]
 CountryName = Annotated[Text, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+GenreName = Annotated[Text, StringConstraints(min_length=1, max_length=40)]
+Decade = Annotated[int, Field(ge=1880, le=2100, multiple_of=10)]
 
 
 class MovieListQuery(BaseModel):
@@ -46,11 +48,20 @@ class MovieListQuery(BaseModel):
         default=None, description="Default: relevance with a title, the weighted rating without one."
     )
     order: Literal["asc", "desc"] | None = Field(default=None, description="Default: asc for title, desc otherwise.")
-    genre: Text | None = Field(default=None, min_length=1, max_length=40, description="A genre of GET /genres.")
+    genre: list[GenreName] = Field(
+        default_factory=list,
+        max_length=10,
+        description="A genre of GET /genres; repeat it to get the movies that have all of them.",
+    )
     country: list[CountryName] = Field(
         default_factory=list,
         max_length=20,
         description="A country of GET /countries; repeat it to get the movies of any of them.",
+    )
+    decade: list[Decade] = Field(
+        default_factory=list,
+        max_length=23,
+        description="The first year of a decade (1990 for the 1990s); repeat it to get the movies of any of them.",
     )
     year_from: int | None = Field(default=None, ge=1880, le=2100)
     year_to: int | None = Field(default=None, ge=1880, le=2100)
@@ -87,6 +98,7 @@ class MovieSummary(BaseModel):
     year: int
     genres: list[str]
     directors: list[str] | None
+    countries: list[str] | None
     duration: int
     avg_vote: float
     votes: int
@@ -158,3 +170,12 @@ class CountryCount(BaseModel):
 
 class CountryList(BaseModel):
     items: list[CountryCount]
+
+
+class YearCount(BaseModel):
+    year: int
+    movies: int
+
+
+class YearList(BaseModel):
+    items: list[YearCount]

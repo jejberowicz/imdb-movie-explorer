@@ -34,6 +34,7 @@ class TestList:
             "year",
             "genres",
             "directors",
+            "countries",
             "duration",
             "avg_vote",
             "votes",
@@ -97,6 +98,26 @@ class TestFiltersAndOrder:
 
     def test_unknown_genre_is_an_empty_list(self, client: FlaskClient) -> None:
         assert client.get("/movies?genre=Nope").get_json()["total"] == 0
+
+    def test_genre_can_repeat_and_matches_all(self, client: FlaskClient) -> None:
+        """Crime and Drama are the crime dramas, not every crime movie and every drama."""
+        crime = set(ids(client.get("/movies?genre=Crime")))
+        body = client.get("/movies?genre=Crime&genre=Drama").get_json()
+        assert body["total"] > 0
+        assert all({"Crime", "Drama"} <= set(movie["genres"]) for movie in body["items"])
+        assert set(ids_of(body)) <= crime
+
+    def test_decade_can_repeat_and_matches_any(self, client: FlaskClient) -> None:
+        nineties = client.get("/movies?decade=1990").get_json()
+        assert nineties["total"] and all(1990 <= movie["year"] <= 1999 for movie in nineties["items"])
+        both = client.get("/movies?decade=1970&decade=1990&page_size=100").get_json()
+        assert {movie["year"] // 10 * 10 for movie in both["items"]} == {1970, 1990}
+        assert both["total"] > nineties["total"]
+
+    def test_a_year_inside_a_decade(self, client: FlaskClient) -> None:
+        body = client.get("/movies?decade=1990&year_from=1994&year_to=1994").get_json()
+        years = [movie["year"] for movie in body["items"]]
+        assert years and set(years) == {1994}
 
     def test_year_range(self, client: FlaskClient) -> None:
         years = [movie["year"] for movie in client.get("/movies?year_from=1990&year_to=1999").get_json()["items"]]
@@ -183,8 +204,13 @@ class TestValidation:
             ("country=" + "x" * 61, "country.0"),
             # A NUL byte reached PostgreSQL, which rejects it: it was a 500.
             ("title=god%00father", "title"),
-            ("genre=Dr%00ama", "genre"),
+            ("genre=Dr%00ama", "genre.0"),
             ("country=USA&country=It%00aly", "country.1"),
+            ("genre=Crime&genre=Dr%00ama", "genre.1"),
+            ("&".join(["genre=Drama"] * 11), "genre"),
+            ("decade=1995", "decade.0"),
+            ("decade=1990&decade=1870", "decade.1"),
+            ("decade=abc", "decade.0"),
         ],
     )
     def test_invalid_parameter_is_a_400_problem(self, client: FlaskClient, query: str, parameter: str) -> None:
@@ -248,6 +274,14 @@ class TestCatalog:
         items = {item["name"]: item for item in response.get_json()["items"]}
         assert items["USA"] == {"name": "USA", "movies": 10, "map_code": "US", "former": False}
         assert items["Argentina"]["map_code"] == "AR"
+
+    def test_years(self, client: FlaskClient) -> None:
+        response = client.get("/years")
+        assert response.headers["Cache-Control"] == "public, max-age=3600"
+        items = response.get_json()["items"]
+        years = [item["year"] for item in items]
+        assert years == sorted(set(years))
+        assert sum(item["movies"] for item in items) == 16
 
 
 class TestHealth:

@@ -109,7 +109,7 @@ React con TypeScript y Vite.
   - cancela los pedidos viejos, así una respuesta lenta no pisa a una nueva;
   - mantiene los resultados anteriores mientras llegan los nuevos, sin parpadeo;
   - cachea cada combinación de parámetros.
-- **El estado vive en la URL** (`?q=&page=&genre=&sort=`), con React Router. Se puede compartir, recargar y
+- **El estado vive en la URL** (`?q=&page=&genre=&decade=&sort=`), con React Router. Se puede compartir, recargar y
   usar el botón atrás.
 - **Tres rutas:**
   - `/` explora y busca;
@@ -159,7 +159,7 @@ fuente.
 | Clave primaria (`imdb_title_id`) | El detalle de una película |
 | GIN con `gin_trgm_ops` en las dos columnas `*_search` | La búsqueda con `LIKE '%…%'` ([ADR 0005](decisions/0005-data-storage.md)) |
 | B-tree en `(weighted_rating DESC, imdb_title_id)` | La lista por defecto, sin ordenar en cada request |
-| GIN en `genres` | El filtro por género (`genres @> ARRAY['Drama']`) |
+| GIN en `genres` | El filtro por género, que con varios pide todos (`genres @> ARRAY['Comedy', 'Romance']`) |
 | GIN en `countries` | El filtro por país, que acepta varios a la vez (`countries && ARRAY['Russia', 'Soviet Union']`) |
 
 Los otros órdenes (año, votos, duración, título) no tienen índice: con 85.855 filas, ordenar en memoria tarda

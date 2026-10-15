@@ -1,8 +1,9 @@
-"""Genres and countries, to build the filters and the map. They only change with a new load, so they are cached."""
+"""Genres, countries and years, to build the filters and the map. They only change with a new load, so they are
+cached."""
 
 from flask_openapi3 import APIBlueprint, Tag
 
-from ..schemas.movies import CountryList, GenreList
+from ..schemas.movies import CountryList, GenreList, YearList
 from ..services import movies as service
 
 catalog_bp = APIBlueprint("catalog", __name__, abp_tags=[Tag(name="catalog")])
@@ -19,3 +20,9 @@ def list_genres():
 def list_countries():
     """The countries as they come in the CSV, with their movies and the country where the map paints them."""
     return service.list_countries().model_dump(mode="json"), 200, CACHE
+
+
+@catalog_bp.get("/years", responses={200: YearList})
+def list_years():
+    """The years with movies, oldest first, with their number of movies."""
+    return service.list_years().model_dump(mode="json"), 200, CACHE

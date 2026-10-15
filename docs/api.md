@@ -24,8 +24,9 @@ Devuelve una página de películas. Con `title`, filtra por título.
 | `page_size` | entero | 20 | Entre 1 y 100 |
 | `sort` | `relevance`, `rating`, `year`, `votes`, `duration`, `title` | `relevance` si hay `title`; si no, `rating` | `relevance` solo vale con `title`. `rating` es el rating ponderado |
 | `order` | `asc`, `desc` | `asc` para `title`; `desc` para el resto | `relevance` siempre es de mayor a menor |
-| `genre` | texto | — | Un género de `GET /genres`, en inglés, como en los datos; hasta 40 caracteres. Uno que no existe devuelve una lista vacía |
+| `genre` | texto, repetible | — | Un género de `GET /genres`, en inglés, como en los datos; hasta 40 caracteres y 10 valores. Con varios, devuelve las películas que tienen todos (`Comedy` y `Romance` son las comedias románticas). Uno que no existe devuelve una lista vacía |
 | `country` | texto, repetible | — | Un país de `GET /countries`, como en los datos; hasta 20 valores. Con varios, devuelve las películas de cualquiera de ellos |
+| `decade` | entero, repetible | — | El primer año de una década (1990 para los 1990s), entre 1880 y 2100; hasta 23 valores. Con varias, devuelve las películas de cualquiera de ellas. Se combina con `year_from` y `year_to` |
 | `year_from`, `year_to` | entero | — | Entre 1880 y 2100, con `year_from` menor o igual que `year_to` |
 | `min_votes` | entero | — | 0 o más |
 
@@ -53,6 +54,7 @@ Devuelve una página de películas. Con `title`, filtra por título.
       "year": 1994,
       "genres": ["Drama"],
       "directors": ["Frank Darabont"],
+      "countries": ["USA"],
       "duration": 142,
       "avg_vote": 9.3,
       "votes": 2278845,
@@ -136,6 +138,17 @@ Se puede cachear, igual que `/genres`.
 
 El ejemplo está recortado: son 194 países.
 
+## `GET /years`
+
+Devuelve los años con películas, del más viejo al más nuevo, con la cantidad de cada uno. La interfaz arma con
+él las décadas del menú «Año» y la tira de años de una década. Se puede cachear, igual que `/genres`.
+
+```json
+{"items": [{"year": 1894, "movies": 1}, {"year": 1906, "movies": 1}, {"year": 2020, "movies": 789}]}
+```
+
+El ejemplo está recortado: son 112 años.
+
 ## `GET /health` y `GET /health/ready`
 
 - `/health` confirma que el proceso responde, sin tocar la base: `{"status": "ok"}`.
@@ -182,6 +195,7 @@ curl "http://localhost:8000/movies"
 curl "http://localhost:8000/movies?title=relatos%20salvajes"
 curl "http://localhost:8000/movies?genre=Drama&year_from=1990&year_to=1999&sort=votes"
 curl "http://localhost:8000/movies/tt0068646"
+curl "http://localhost:8000/movies?genre=Comedy&genre=Romance&decade=1990&decade=2010"
 curl "http://localhost:8000/genres"
 curl "http://localhost:8000/movies?country=Russia&country=Soviet%20Union"
 ```

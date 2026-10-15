@@ -98,10 +98,11 @@ Así la API usa el usuario dueño. Los usuarios separados (dueño sin superusuar
 
 | Endpoint | Qué devuelve |
 |---|---|
-| `GET /movies` | Una página de películas. Filtra con `title`, `genre`, `country` (repetible), `year_from`, `year_to` y `min_votes`; ordena con `sort` (`relevance`, `rating`, `year`, `votes`, `duration`, `title`) y `order` (`asc`, `desc`); pagina con `page` y `page_size` (hasta 100) |
+| `GET /movies` | Una página de películas. Filtra con `title`, `genre`, `country` y `decade` (repetibles), `year_from`, `year_to` y `min_votes`; ordena con `sort` (`relevance`, `rating`, `year`, `votes`, `duration`, `title`) y `order` (`asc`, `desc`); pagina con `page` y `page_size` (hasta 100) |
 | `GET /movies/{imdb_title_id}` | El detalle completo de una película |
 | `GET /genres` | Los 25 géneros, con su cantidad de películas |
 | `GET /countries` | Los 194 países del CSV, con su cantidad de películas y el código ISO donde los pinta el mapa |
+| `GET /years` | Los años con películas, con su cantidad |
 | `GET /health`, `GET /health/ready` | Si el proceso responde; si además la base responde y tiene las películas cargadas |
 
 ```bash

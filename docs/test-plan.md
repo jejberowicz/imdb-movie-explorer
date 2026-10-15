@@ -63,8 +63,8 @@ Con ese CSV se prueba:
   `/movies`, sin colgar al worker.
 - La seguridad: los headers, el 429 con `Retry-After`, el límite sumando todas las rutas (y los 404 y 405), y la
   IP detrás del proxy.
-- `GET /genres` y `GET /countries` devuelven sus cantidades y se pueden cachear; `country` repetido devuelve
-  las películas de cualquiera de esos países.
+- `GET /genres`, `GET /countries` y `GET /years` devuelven sus cantidades y se pueden cachear; `country` y
+  `decade` repetidos devuelven las películas de cualquiera de ellos, y `genre` repetido, las que tienen todos.
 - El orden alfabético saltea los símbolos del principio del título y deja al final, en los dos sentidos, los
   títulos hechos solo de símbolos.
 
