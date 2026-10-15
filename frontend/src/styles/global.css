@@ -1,0 +1,115 @@
+/* Design tokens (docs/ui.md). The contrasts are checked against WCAG AA. */
+:root {
+  --nav: #0e1217;
+  --page: #1b2129;
+  --surface: #252d37;
+  --raised: #2c3540;
+  --line: #35414e;
+  --control: #6e7b88;
+  --text: #e7ebef;
+  --muted: #9aa6b3;
+  --accent: #f2b544;
+  --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-display: 'Oswald', 'Arial Narrow', sans-serif;
+  --font-serif: 'Fraunces', Georgia, serif;
+  --radius: 4px;
+  --width: 1120px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font: 15px/1.5 var(--font-ui);
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wrap {
+  max-width: var(--width);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Text for screen readers only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -48px;
+  z-index: 20;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: var(--nav);
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
+.label {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.link-button {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button {
+  padding: 6px 14px;
+  background: var(--raised);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.loading {
+  padding: 56px 0;
+  color: var(--muted);
+  text-align: center;
+}
