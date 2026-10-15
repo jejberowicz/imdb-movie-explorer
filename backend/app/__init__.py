@@ -2,6 +2,8 @@
 
 from flask_openapi3 import Info, OpenAPI
 
+from .api.health import health_bp
+from .api.movies import movies_bp
 from .config import Settings
 from .db import init_engine
 from .etl.cli import seed_command
@@ -19,5 +21,7 @@ def create_app(settings: Settings | None = None) -> OpenAPI:
     app.json.sort_keys = False
     app.json.ensure_ascii = False
     init_engine(app, settings.database_url)
+    app.register_api(health_bp)
+    app.register_api(movies_bp)
     app.cli.add_command(seed_command)
     return app

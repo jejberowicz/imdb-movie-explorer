@@ -11,8 +11,11 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
+from flask.testing import FlaskClient
 from sqlalchemy import Engine, create_engine, text
 
+from app import create_app
+from app.config import Settings
 from app.etl.load import load
 
 BACKEND = Path(__file__).resolve().parent.parent
@@ -48,3 +51,10 @@ def sample_db(engine: Engine) -> Engine:
     """The database loaded with the hand-picked sample: 16 real movies that cover the search cases."""
     load(engine, SAMPLE_CSV)
     return engine
+
+
+@pytest.fixture
+def client(sample_db: Engine, database_url: str) -> FlaskClient:
+    app = create_app(Settings(database_url=database_url))
+    app.config["TESTING"] = True
+    return app.test_client()
