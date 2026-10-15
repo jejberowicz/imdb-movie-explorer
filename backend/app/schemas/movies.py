@@ -14,6 +14,8 @@ from pydantic import (
     model_validator,
 )
 
+from ..text import fold
+
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -57,7 +59,9 @@ class MovieListQuery(BaseModel):
     @field_validator("title")
     @classmethod
     def blank_means_no_filter(cls, value: str | None) -> str | None:
-        return (value.strip() or None) if value is not None else None
+        # Blank once folded, as the search compares it: only spaces, or only accents with no letter («%CC%81»).
+        # Searching "" would match the whole catalog with the slowest query.
+        return value.strip() if value is not None and fold(value) else None
 
     @model_validator(mode="after")
     def consistent(self) -> "MovieListQuery":

@@ -70,6 +70,11 @@ class TestSearch:
     def test_blank_title_means_no_filter(self, client: FlaskClient) -> None:
         assert client.get("/movies?title=%20%20").get_json()["total"] == 16
 
+    def test_title_without_letters_after_folding_means_no_filter(self, client: FlaskClient) -> None:
+        """A lone combining accent folds to "": as a search it matched every movie with the slowest query."""
+        assert ids(client.get("/movies?title=%CC%81%CC%81&page_size=100")) == ids(client.get("/movies?page_size=100"))
+        assert client.get("/movies?title=%CC%81&sort=relevance").status_code == 400
+
     def test_search_can_be_sorted_by_another_field(self, client: FlaskClient) -> None:
         assert ids(client.get("/movies?title=godfather&sort=year&order=asc")) == ["tt0068646", "tt0071562", "tt0099674"]
 
