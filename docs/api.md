@@ -33,8 +33,9 @@ Devuelve una página de películas. Con `title`, filtra por título.
   - busca el texto en cualquier parte del título original o del italiano;
   - no distingue mayúsculas ni acentos;
   - toma `%` y `_` como caracteres literales.
-- **Relevancia:** primero los títulos iguales al texto buscado, después los que empiezan con él y al final el
-  resto; dentro de cada grupo, de más a menos votos.
+- **Relevancia:** combina la popularidad con qué tan bien coincide el título. Es el logaritmo de los votos, más
+  2 si un título es igual al texto buscado y 1 si empieza con él. Así *The Godfather* (1,5 millones de votos)
+  sale antes que una película llamada exactamente «Godfather» (2.839 votos).
 - **Desempates:** todo orden termina en `imdb_title_id`, así la paginación es estable.
 - **Parámetros desconocidos:** se ignoran.
 
@@ -85,7 +86,8 @@ Devuelve el detalle completo de una película. El id tiene que ser `tt` seguido 
   "writers": ["Stephen King", "Frank Darabont"],
   "production_company": "Castle Rock Entertainment",
   "actors": ["Tim Robbins", "Morgan Freeman", "Bob Gunton", "William Sadler", "Clancy Brown", "Gil Bellows",
-             "Mark Rolston", "James Whitmore", "Jeffrey DeMunn", "Larry Brandenburg", "Neil Giunto"],
+             "Mark Rolston", "James Whitmore", "Jeffrey DeMunn", "Larry Brandenburg", "Neil Giuntoli",
+             "Brian Libby", "David Proval", "Joseph Ragno", "Jude Ciccolella"],
   "description": "Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.",
   "avg_vote": 9.3,
   "votes": 2278845,

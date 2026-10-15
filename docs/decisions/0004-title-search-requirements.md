@@ -38,7 +38,7 @@ Requisitos de la búsqueda, independientes de cómo se implemente:
 | 1 | Busca en `title` y en `original_title`: encuentra todo lo que encontraría filtrar solo por `title`, más los títulos originales | **Aceptada** |
 | 2 | Ignora mayúsculas y acentos: «amelie» encuentra *Le fabuleux destin d'Amélie Poulain* | **Aceptada** |
 | 3 | Escapa `%` y `_`: `?title=%` devuelve solo los títulos que contienen `%` | **Aceptada** |
-| 4 | Ordena por relevancia y popularidad. En las cuatro búsquedas de prueba, la película más votada entre los resultados es la esperada | **Aceptada** |
+| 4 | Ordena por relevancia y popularidad: el logaritmo de los votos, más 2 si un título es igual a la búsqueda y 1 si empieza con ella. Primero se ordenó por coincidencia y después por votos, y con «godfather» una película llamada exactamente «Godfather» (2.839 votos) quedaba antes que *The Godfather*. En las cuatro búsquedas de prueba, la primera es la esperada | **Aceptada** |
 | 5 | `title` acepta hasta 200 caracteres; uno más largo es un error de validación. El límite es para lo que se busca, no para los datos: el 99 % de los títulos tiene hasta 46 caracteres, ninguno pasa de 200, y el más largo, de 196, es real (*Night of the Day of the Dawn…*, una parodia) | **Aceptada** |
 | 6 | No hay un mínimo de caracteres | **Aceptada** |
 
