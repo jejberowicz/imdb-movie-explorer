@@ -1,0 +1,21 @@
+[project]
+name = "imdb-movie-explorer-api"
+version = "1.0.0"
+description = "Flask REST API over the IMDb movies CSV, loaded into PostgreSQL"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use assert and hard-coded throwaway credentials by design.
+"tests/**" = ["S101", "S105", "S106"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = ["acceptance: loads the full CSV into the test database (a few seconds)"]

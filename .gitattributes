@@ -1,3 +1,6 @@
 # Store and check out text files with LF on every OS (Windows included), so shell
 # scripts and Docker entrypoints don't break with CRLF ("/bin/sh^M: bad interpreter").
 * text=auto eol=lf
+
+# Compressed data is binary: git must never convert it (ADR 0006).
+*.gz binary

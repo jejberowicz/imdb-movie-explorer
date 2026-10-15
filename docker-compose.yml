@@ -1,0 +1,76 @@
+# The whole project from scratch with one command: docker compose up --build
+#
+# Start order, each step waiting for the previous one:
+#   db (healthy) -> seed (migrations + CSV load, then exits) -> api (healthy) -> web
+#
+# The passwords below are defaults for a local database that is never published outside the Docker network.
+# Override them in a .env file (see .env.example).
+name: imdb-movie-explorer
+
+x-database-url: &database-url postgresql+psycopg://movies:${POSTGRES_PASSWORD:-movies-local-only}@db:5432/movies
+
+services:
+  db:
+    image: postgres:18.6-trixie
+    environment:
+      POSTGRES_DB: movies
+      POSTGRES_USER: movies
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-movies-local-only}
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U movies -d movies"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  seed:
+    image: imdb-movie-explorer/api:local
+    build:
+      context: ./backend
+      target: runtime
+    command: ["sh", "-c", "alembic upgrade head && flask --app app seed /data/IMDb_movies.csv.gz"]
+    environment:
+      DATABASE_URL: *database-url
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: imdb-movie-explorer/api:local
+    build:
+      context: ./backend
+      target: runtime
+    environment:
+      DATABASE_URL: *database-url
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    image: imdb-movie-explorer/web:local
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  db-data:

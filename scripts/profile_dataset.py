@@ -18,6 +18,7 @@ import argparse
 import codecs
 import csv
 import gzip
+import io
 import re
 import statistics
 import unicodedata
@@ -27,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CSV = ROOT / "data" / "IMDb_movies.csv"
+DEFAULT_CSV = ROOT / "data" / "IMDb_movies.csv.gz"
 DEFAULT_OUT = ROOT / "docs" / "data-profile.md"
 
 Row = dict[str, str]
@@ -259,18 +260,23 @@ def movie(row: Row) -> str:
 # --- Loading
 
 
+def read_raw(path: Path) -> bytes:
+    """The bytes of the CSV; a .gz file is decompressed in memory."""
+    data = path.read_bytes()
+    return gzip.decompress(data) if path.suffix == ".gz" else data
+
+
 def load(path: Path) -> tuple[list[str], list[Row], list[int]]:
     """Read the CSV. Rows with a wrong number of fields are set aside (by line number), not fatal."""
     rows: list[Row] = []
     malformed: list[int] = []
-    with path.open(encoding="utf-8-sig", newline="") as f:
-        reader = csv.reader(f)
-        header = next(reader, [])
-        for fields in reader:
-            if len(fields) == len(header):
-                rows.append(dict(zip(header, fields)))
-            else:
-                malformed.append(reader.line_num)
+    reader = csv.reader(io.StringIO(read_raw(path).decode("utf-8-sig"), newline=""))
+    header = next(reader, [])
+    for fields in reader:
+        if len(fields) == len(header):
+            rows.append(dict(zip(header, fields)))
+        else:
+            malformed.append(reader.line_num)
     return header, rows, malformed
 
 
@@ -278,7 +284,7 @@ def load(path: Path) -> tuple[list[str], list[Row], list[int]]:
 
 
 def section_overview(path: Path, header: list[str], rows: list[Row], malformed: list[int]) -> list[str]:
-    raw = path.read_bytes()
+    raw = read_raw(path)
     gz_size = len(gzip.compress(raw, compresslevel=9))
     crlf, lf = raw.count(b"\r\n"), raw.count(b"\n")
     endings = "LF" if not crlf else "CRLF (Windows) en todas las líneas" if crlf == lf else "mezclados"
