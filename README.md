@@ -138,7 +138,7 @@ película no existe y 429 si se pasa el límite de pedidos. Nunca devuelven un s
 ## Tests
 
 ```bash
-# Backend: 158 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
+# Backend: 162 tests contra un PostgreSQL real, incluidos los criterios de aceptación sobre el CSV completo
 cd backend
 python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 docker run -d --name imdb-dev-db -e POSTGRES_USER=movies -e POSTGRES_PASSWORD=movies \
