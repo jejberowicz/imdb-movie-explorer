@@ -39,6 +39,7 @@ class MovieFilters:
     genres: tuple[str, ...] = ()
     countries: tuple[str, ...] = ()
     decades: tuple[int, ...] = ()
+    years: tuple[int, ...] = ()
     year_from: int | None = None
     year_to: int | None = None
     min_votes: int | None = None
@@ -60,6 +61,8 @@ def _conditions(filters: MovieFilters) -> list[ColumnElement[bool]]:
     if filters.decades:
         # Any of them: a movie has a single year.
         conditions.append(or_(*(movies.c.year.between(decade, decade + 9) for decade in sorted(set(filters.decades)))))
+    if filters.years:
+        conditions.append(movies.c.year.in_(sorted(set(filters.years))))
     if filters.year_from is not None:
         conditions.append(movies.c.year >= filters.year_from)
     if filters.year_to is not None:

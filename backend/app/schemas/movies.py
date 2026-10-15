@@ -31,6 +31,7 @@ SortField = Literal["relevance", "rating", "year", "votes", "duration", "title"]
 CountryName = Annotated[Text, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
 GenreName = Annotated[Text, StringConstraints(min_length=1, max_length=40)]
 Decade = Annotated[int, Field(ge=1880, le=2100, multiple_of=10)]
+Year = Annotated[int, Field(ge=1880, le=2100)]
 
 
 class MovieListQuery(BaseModel):
@@ -62,6 +63,11 @@ class MovieListQuery(BaseModel):
         default_factory=list,
         max_length=23,
         description="The first year of a decade (1990 for the 1990s); repeat it to get the movies of any of them.",
+    )
+    year: list[Year] = Field(
+        default_factory=list,
+        max_length=50,
+        description="A year; repeat it to get the movies of any of them.",
     )
     year_from: int | None = Field(default=None, ge=1880, le=2100)
     year_to: int | None = Field(default=None, ge=1880, le=2100)

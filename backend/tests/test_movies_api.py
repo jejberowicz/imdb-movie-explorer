@@ -119,6 +119,13 @@ class TestFiltersAndOrder:
         years = [movie["year"] for movie in body["items"]]
         assert years and set(years) == {1994}
 
+    def test_year_can_repeat_and_matches_any(self, client: FlaskClient) -> None:
+        nineties = client.get("/movies?decade=1990&page_size=100").get_json()
+        first, second = sorted({movie["year"] for movie in nineties["items"]})[:2]
+        body = client.get(f"/movies?decade=1990&year={first}&year={second}&page_size=100").get_json()
+        assert {movie["year"] for movie in body["items"]} == {first, second}
+        assert body["total"] == sum(movie["year"] in (first, second) for movie in nineties["items"])
+
     def test_year_range(self, client: FlaskClient) -> None:
         years = [movie["year"] for movie in client.get("/movies?year_from=1990&year_to=1999").get_json()["items"]]
         assert years and all(1990 <= year <= 1999 for year in years)
@@ -211,6 +218,8 @@ class TestValidation:
             ("decade=1995", "decade.0"),
             ("decade=1990&decade=1870", "decade.1"),
             ("decade=abc", "decade.0"),
+            ("year=1879", "year.0"),
+            ("year=1990&year=2101", "year.1"),
         ],
     )
     def test_invalid_parameter_is_a_400_problem(self, client: FlaskClient, query: str, parameter: str) -> None:

@@ -31,6 +31,7 @@ def list_movies(query: MovieListQuery) -> MoviePage:
         genres=tuple(query.genre),
         countries=tuple(query.country),
         decades=tuple(query.decade),
+        years=tuple(query.year),
         year_from=query.year_from,
         year_to=query.year_to,
         min_votes=query.min_votes,
