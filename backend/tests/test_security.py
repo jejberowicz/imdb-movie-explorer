@@ -58,6 +58,20 @@ def test_several_limits_are_valid(monkeypatch: pytest.MonkeyPatch) -> None:
     assert Settings.from_env().rate_limit == "300 per minute; 20 per second"
 
 
+def test_requests_that_match_no_route_are_limited_too(sample_db: Engine, database_url: str) -> None:
+    """Flask-Limiter skips a request without an endpoint: 404 and 405 were free to repeat without end."""
+    client = make_client(database_url, rate_limit="2 per minute")
+    outside = {"REMOTE_ADDR": "203.0.113.9"}
+    statuses = [
+        client.get("/nope", environ_base=outside).status_code,
+        client.post("/movies", environ_base=outside).status_code,
+        client.get("/other", environ_base=outside).status_code,
+    ]
+    assert statuses == [404, 405, 429]
+    # The routes have their own count.
+    assert client.get("/genres", environ_base=outside).status_code == 200
+
+
 def test_the_docker_health_check_is_never_limited(sample_db: Engine, database_url: str) -> None:
     client = make_client(database_url, rate_limit="1 per minute")
     assert {client.get("/health/ready").status_code for _ in range(5)} == {200}

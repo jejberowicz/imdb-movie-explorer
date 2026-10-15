@@ -14,6 +14,7 @@ HEADERS = {
     "X-Frame-Options": "DENY",
 }
 LOOPBACK = {"127.0.0.1", "::1"}
+UNMATCHED = "<no route>"
 # The JSON responses load nothing and can't be framed. Swagger UI (/docs) needs its own scripts, so it is left out.
 API_CSP = "default-src 'none'; frame-ancestors 'none'"
 
@@ -31,6 +32,9 @@ def init_security(app: Flask, settings: Settings) -> None:
         default_limits=[settings.rate_limit],
         storage_uri="memory://",
         headers_enabled=True,
+        # Flask-Limiter exempts a request without an endpoint, so 404s and 405s had no limit at all. They share
+        # one count per client instead, like any route.
+        request_identifier=lambda: request.endpoint or UNMATCHED,
     )
 
     @limiter.request_filter
