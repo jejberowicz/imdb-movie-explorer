@@ -22,3 +22,6 @@ htmlcov/
 Thumbs.db
 .idea/
 .vscode/
+
+# Data: only the compressed CSV is versioned (ADR 0006)
+data/*.csv

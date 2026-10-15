@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import json
 import os
 import platform
@@ -33,12 +34,12 @@ import sys
 import tempfile
 import time
 import unicodedata
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CSV = ROOT / "data" / "IMDb_movies.csv"
+DEFAULT_CSV = ROOT / "data" / "IMDb_movies.csv.gz"
 QUERIES = ["shawshank", "godfather", "relatos salvajes", "amelie", "aeon flux", "the", "up", "%"]
 PAGE = 20
 WARMUP, RUNS, WORKER_RUNS = 3, 25, 3
@@ -72,7 +73,8 @@ def search_params(query: str) -> dict[str, str]:
 
 def read_csv(path: Path) -> tuple[list[str], Rows, list[tuple[Any, ...]]]:
     """Raw rows plus the derived columns: year, rating, votes, weighted rating and the folded titles."""
-    with path.open(encoding="utf-8-sig", newline="") as f:
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
         header = next(reader)
         rows = list(reader)

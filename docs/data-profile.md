@@ -1,6 +1,6 @@
 # Perfil del dataset
 
-Generado con `python3 scripts/profile_dataset.py` sobre `data/IMDb_movies.csv`. No editar a mano.
+Generado con `python3 scripts/profile_dataset.py` sobre `data/IMDb_movies.csv.gz`. No editar a mano.
 
 ## Resumen
 
