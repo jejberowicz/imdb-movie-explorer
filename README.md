@@ -2,7 +2,7 @@
 
 Una API REST en Flask y una interfaz en React para explorar y buscar las 85.855 películas del CSV de IMDb.
 Se busca por título mientras se escribe, en el título original o en el italiano, sin importar mayúsculas ni
-acentos. También se puede filtrar por uno o varios géneros, décadas (o un año) y países (con un mapa), ordenar
+acentos. También se puede filtrar por uno o varios géneros, décadas(o un o varios años) y países (con un mapa), ordenar
 y ver el detalle de cada película. Los datos viven en PostgreSQL, y todo se levanta con un solo comando.
 
 ![La pantalla de explorar: barra «Explorar por», búsqueda y pósters generados](docs/screenshots/explorar.png)
@@ -17,6 +17,13 @@ y ver el detalle de cada película. Los datos viven en PostgreSQL, y todo se lev
     <td><img src="docs/screenshots/por-pais.png" alt="Mapa por país: Rusia suma las películas de la Unión Soviética"></td>
   </tr>
 </table>
+
+### Recorrido en video
+
+Un recorrido de 1 min 24 s, sin sonido, por los menús de explorar, la tira de años, los órdenes, los géneros,
+el filtro por país y el detalle de una película.
+
+https://github.com/user-attachments/assets/f209bb5d-09ff-46d9-bc3b-c08b075313b1
 
 ## Cómo levantarlo
 
